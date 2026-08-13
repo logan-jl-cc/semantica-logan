@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantica · 决策因果链回溯过程</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;  --page: #f9f9f7;
+    --ink-1: #0b0b0b;  --ink-2: #52514e;  --ink-muted: #898781;
+    --gridline: #e1e0d9;  --baseline: #c3c2b7;
+    --ring: rgba(11,11,11,0.10);
+    --decision: #2a78d6;  --business: #1baf7a;  --meta: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page:#0d0d0d;
+      --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+      --gridline:#2c2c2a; --baseline:#383835; --ring:rgba(255,255,255,.10);
+      --decision:#3987e5; --business:#199e70; --meta:#d95926;
+    }
+  }
+  :root[data-theme="dark"]{color-scheme:dark;--surface-1:#1a1a19;--page:#0d0d0d;--ink-1:#ffffff;--ink-2:#c3c2b7;--ink-muted:#898781;--gridline:#2c2c2a;--baseline:#383835;--ring:rgba(255,255,255,.10);--decision:#3987e5;--business:#199e70;--meta:#d95926}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--page);color:var(--ink-1);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto;padding:28px 24px 60px}
+  header h1{font-size:23px;margin:0 0 6px;font-weight:650;letter-spacing:-0.01em}
+  header p{color:var(--ink-2);margin:0 0 3px;font-size:14px;line-height:1.5}
+  header .hint{color:var(--ink-muted);font-size:12.5px}
+  code{background:var(--gridline);padding:1px 5px;border-radius:4px;font-size:11.5px}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+  .panel{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:18px 20px}
+  .panel h2{font-size:14.5px;margin:0 0 3px;font-weight:650;display:flex;align-items:center;gap:8px}
+  .panel h2 .tag{font-size:10.5px;padding:2px 8px;border-radius:20px;color:#fff;font-weight:600}
+  .panel .api{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink-2);margin:2px 0 14px}
+
+  .step{display:flex;gap:11px;align-items:flex-start;margin-bottom:11px}
+  .step .num{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--decision);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .step .num.up{background:var(--meta)}
+  .step .body{font-size:12.5px;line-height:1.5;color:var(--ink-1)}
+  .step .body b{font-weight:600}
+  .step .body .muted{color:var(--ink-muted)}
+
+  svg{display:block;width:100%;height:auto}
+  .edge{fill:none;stroke-width:2.5}
+  .edge.dim{opacity:.25}
+  .nl{font-size:11.5px;font-weight:600;fill:var(--ink-1)}
+  .ns{font-size:9.5px;fill:var(--ink-muted)}
+  .step-label{font-size:10.5px;font-weight:700}
+
+  .result{margin-top:14px;padding:11px 14px;background:var(--page);border:1px solid var(--ring);border-radius:8px;font-size:12.5px;color:var(--ink-1)}
+  .result b{color:var(--decision)}
+
+  footer{margin-top:22px;font-size:12px;color:var(--ink-muted);line-height:1.65}
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+<header>
+  <h1>决策因果链回溯过程</h1>
+  <p>同一个贷款审批图,展示 <code>trace_decision_chain()</code> 与 <code>analyze_decision_impact()</code> 如何沿 <b>CAUSED / INFLUENCED</b> 边遍历</p>
+  <p class="hint">← 左:向上游回溯"这个利率决策是怎么来的" ｜ 右:向下游分析"承销决策影响了什么" →</p>
+</header>
+
+<div class="two">
+  <!-- LEFT: upstream trace -->
+  <div class="panel">
+    <h2>向上游回溯 <span class="tag" style="background:var(--meta)">upstream</span></h2>
+    <div class="api">trace_decision_chain(rate, direction="upstream")</div>
+
+    <svg viewBox="0 0 540 360" role="img" aria-label="上游回溯">
+      <defs>
+        <marker id="um" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--meta)"/></marker>
+      </defs>
+      <!-- the two causal edges, walked backward -->
+      <path class="edge" style="stroke:var(--meta)" d="M400,200 C340,200 290,200 240,200" marker-end="url(#um)"/>
+      <path class="edge" style="stroke:var(--meta)" d="M210,200 C160,200 110,200 70,200" marker-end="url(#um)"/>
+
+      <!-- nodes -->
+      <g><circle cx="465" cy="200" r="52" fill="var(--decision)" fill-opacity=".22" stroke="var(--decision)" stroke-width="2.5"/>
+         <text class="nl" text-anchor="middle" y="192">interest_rate</text>
+         <text class="ns" text-anchor="middle" y="208">rate_set_8.9pct</text>
+         <text class="ns" text-anchor="middle" y="222" style="font-weight:600;fill:var(--decision)">起点</text></g>
+      <g><circle cx="275" cy="200" r="52" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/>
+         <text class="nl" text-anchor="middle" y="192">underwriting</text>
+         <text class="ns" text-anchor="middle" y="208">approved</text></g>
+      <g><circle cx="60" cy="200" r="48" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/>
+         <text class="nl" text-anchor="middle" y="194">credit_app</text>
+         <text class="ns" text-anchor="middle" y="210">proceed</text></g>
+
+      <!-- step labels above edges -->
+      <text class="step-label" x="320" y="180" text-anchor="middle" fill="var(--meta)">① 沿 INFLUENCED 逆向</text>
+      <text class="step-label" x="135" y="180" text-anchor="middle" fill="var(--meta)">② 沿 CAUSED 逆向</text>
+      <!-- distance badges -->
+      <text x="275" y="270" text-anchor="middle" font-size="10" fill="var(--ink-muted)">distance 1 · conf 0.94 · by alice</text>
+      <text x="60" y="270" text-anchor="middle" font-size="10" fill="var(--ink-muted)">distance 2 · conf 0.88 · by system_auto</text>
+    </svg>
+
+    <div class="step"><div class="num up">1</div><div class="body">从 <b>rate</b>(利率决策)出发,沿 <code>INFLUENCED</code> 边<b>逆向</b>走到 <b>underwriting</b> <span class="muted">(承销审批导致它)</span></div></div>
+    <div class="step"><div class="num up">2</div><div class="body">继续沿 <code>CAUSED</code> 边逆向走到 <b>credit_application</b> <span class="muted">(申请受理导致了承销)</span></div></div>
+    <div class="step"><div class="num up">3</div><div class="body">到达根因,返回有序链 <span class="muted">— 每步带 <code>causal_distance</code>(因果距离)</span></div></div>
+
+    <div class="result">回溯结果:<b>rate ← INFLUENCED ← underwriting ← CAUSED ← credit_application</b><br><span style="color:var(--ink-muted);font-size:11.5px">回答"这个利率决策是怎么一步步来的"——这正是监管要的"why"</span></div>
+  </div>
+
+  <!-- RIGHT: downstream impact -->
+  <div class="panel">
+    <h2>向下游影响 <span class="tag" style="background:var(--decision)">downstream</span></h2>
+    <div class="api">analyze_decision_impact(uw)   # uw = 承销决策</div>
+
+    <svg viewBox="0 0 540 360" role="img" aria-label="下游影响">
+      <defs>
+        <marker id="dm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--decision)"/></marker>
+      </defs>
+      <!-- non-walked edge (dim) -->
+      <path class="edge dim" style="stroke:var(--ink-muted);stroke-dasharray:4 3" d="M210,200 C160,200 110,200 70,200"/>
+      <!-- walked edge forward -->
+      <path class="edge" style="stroke:var(--decision)" d="M300,200 C360,200 410,200 460,200" marker-end="url(#dm)"/>
+
+      <g><circle cx="65" cy="200" r="46" fill="var(--decision)" fill-opacity=".10" stroke="var(--ink-muted)" stroke-width="1.5" stroke-dasharray="3 2"/>
+         <text class="nl" text-anchor="middle" y="194" style="fill:var(--ink-muted)">credit_app</text>
+         <text class="ns" text-anchor="middle" y="210">上游(忽略)</text></g>
+      <g><circle cx="245" cy="200" r="54" fill="var(--decision)" fill-opacity=".22" stroke="var(--decision)" stroke-width="2.5"/>
+         <text class="nl" text-anchor="middle" y="190">underwriting</text>
+         <text class="ns" text-anchor="middle" y="206">approved</text>
+         <text class="ns" text-anchor="middle" y="220" style="font-weight:600;fill:var(--decision)">起点</text></g>
+      <g><circle cx="475" cy="200" r="52" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/>
+         <text class="nl" text-anchor="middle" y="192">interest_rate</text>
+         <text class="ns" text-anchor="middle" y="208">rate_set_8.9pct</text></g>
+
+      <text class="step-label" x="380" y="180" text-anchor="middle" fill="var(--decision)">① 沿 INFLUENCED 正向</text>
+      <text x="475" y="272" text-anchor="middle" font-size="10" fill="var(--ink-muted)">直接影响 · 影响分 0.45</text>
+      <text x="245" y="272" text-anchor="middle" font-size="10" fill="var(--ink-muted)">total_influenced = 2</text>
+    </svg>
+
+    <div class="step"><div class="num">1</div><div class="body">从 <b>underwriting</b> 出发,沿 <code>INFLUENCED</code> 边<b>正向</b>遍历,找到下游 <b>rate</b> <span class="muted">(承销影响了定价)</span></div></div>
+    <div class="step"><div class="num">2</div><div class="body">统计 <b>total_influenced</b>、计算每条下游的 <b>影响分</b> <span class="muted">(直接 + 间接)</span></div></div>
+    <div class="step"><div class="num">3</div><div class="body">返回影响图谱 <span class="muted">— direct_influence / indirect_influence / max_score</span></div></div>
+
+    <div class="result">影响结果:<b>underwriting → 影响了 1 个直接下游(rate)</b>,<b>总波及 2</b>,<b>最高影响分 0.45</b><br><span style="color:var(--ink-muted);font-size:11.5px">回答"如果撤销承销决策,什么会受牵连"——风险传导分析</span></div>
+  </div>
+</div>
+
+<footer>
+  <b>本质:</b> 决策图谱一旦建成(节点 + 因果边),回溯/影响分析就是<b>沿 CAUSED / INFLUENCED 边的有向图遍历</b>——无需重跑推理,直接读图。
+  上游回溯(upstream)回答 <b>"why"</b>(监管审计),下游影响(downstream)回答 <b>"what if"</b>(风险传导)。
+  这正是《决策原生方法论》里<b>决策轨迹</b>与<b>决策账本</b>的工程体现:决策不仅被记录,还能被<b>回放</b>与<b>波及分析</b>。
+</footer>
+</div>
+</body>
+</html>

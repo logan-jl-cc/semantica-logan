@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantica · 先例检索机制(混合检索)</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;  --page: #f9f9f7;
+    --ink-1: #0b0b0b;  --ink-2: #52514e;  --ink-muted: #898781;
+    --gridline: #e1e0d9;  --baseline: #c3c2b7;
+    --ring: rgba(11,11,11,0.10);
+    --decision: #2a78d6;  --business: #1baf7a;  --meta: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) { color-scheme:dark;--surface-1:#1a1a19;--page:#0d0d0d;--ink-1:#ffffff;--ink-2:#c3c2b7;--ink-muted:#898781;--gridline:#2c2c2a;--baseline:#383835;--ring:rgba(255,255,255,.10);--decision:#3987e5;--business:#199e70;--meta:#d95926; }
+  }
+  :root[data-theme="dark"]{color-scheme:dark;--surface-1:#1a1a19;--page:#0d0d0d;--ink-1:#ffffff;--ink-2:#c3c2b7;--ink-muted:#898781;--gridline:#2c2c2a;--baseline:#383835;--ring:rgba(255,255,255,.10);--decision:#3987e5;--business:#199e70;--meta:#d95926}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--page);color:var(--ink-1);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1280px;margin:0 auto;padding:28px 24px 60px}
+  header h1{font-size:23px;margin:0 0 6px;font-weight:650;letter-spacing:-0.01em}
+  header p{color:var(--ink-2);margin:0 0 3px;font-size:14px;line-height:1.5}
+  header .hint{color:var(--ink-muted);font-size:12.5px}
+  code{background:var(--gridline);padding:1px 5px;border-radius:4px;font-size:11.5px}
+
+  .panel{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:18px 20px;margin-top:14px}
+  .panel h2{font-size:14.5px;margin:0 0 3px;font-weight:650}
+  .panel .api{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink-2);margin:2px 0 14px}
+
+  svg{display:block;width:100%;height:auto}
+  .box{stroke-width:2}
+  .nl{font-size:12px;font-weight:600;fill:var(--ink-1)}
+  .ns{font-size:10px;fill:var(--ink-muted)}
+  .flow{fill:none;stroke-width:2.5}
+  .w-num{font-size:18px;font-weight:700}
+
+  .weights{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 4px}
+  .wcard{background:var(--page);border:1px solid var(--ring);border-radius:8px;padding:11px 13px}
+  .wcard .pct{font-size:20px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+  .wcard .nm{font-size:11.5px;color:var(--ink-muted);margin-top:4px}
+  .wbar{height:5px;border-radius:3px;margin-top:7px;background:var(--gridline)}
+  .wbar i{display:block;height:100%;border-radius:3px}
+
+  .note{margin-top:14px;padding:11px 14px;background:var(--page);border:1px solid var(--ring);border-radius:8px;font-size:12.5px;color:var(--ink-2);line-height:1.55}
+  .note b{color:var(--ink-1)}
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+<header>
+  <h1>先例检索机制 · 混合检索(find_similar_decisions)</h1>
+  <p>展示一次"找相似历史决策"在内部如何工作:<b>向量语义召回 + 图结构过滤 + 加权融合</b></p>
+  <p class="hint">基于 <code>decision_query.py</code> 中 <code>find_precedents_hybrid</code> 的真实实现(默认权重 0.4/0.3/0.2/0.1,三档降级)。图为机制示意。</p>
+</header>
+
+<div class="panel">
+  <h2>检索流程</h2>
+  <div class="api">find_precedents_hybrid(scenario="个人贷款审批 低DTI", category="loan_underwriting")</div>
+
+  <svg viewBox="0 0 1180 420" role="img" aria-label="混合检索流程">
+    <defs>
+      <marker id="fm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--ink-2)"/></marker>
+    </defs>
+
+    <!-- query input -->
+    <g><rect class="box" x="20" y="160" width="150" height="80" rx="10" fill="var(--meta)" fill-opacity=".12" stroke="var(--meta)"/>
+       <text class="nl" x="95" y="188" text-anchor="middle">🔍 查询</text>
+       <text class="ns" x="95" y="206" text-anchor="middle">个人贷款审批 低DTI</text>
+       <text class="ns" x="95" y="220" text-anchor="middle">category=underwriting</text></g>
+
+    <!-- 4 channels -->
+    <g><rect class="box" x="270" y="40" width="180" height="62" rx="9" fill="var(--decision)" fill-opacity=".14" stroke="var(--decision)"/>
+       <text class="nl" x="360" y="64" text-anchor="middle">① 语义向量</text>
+       <text class="ns" x="360" y="82" text-anchor="middle">reasoning_embedding</text>
+       <text class="ns" x="360" y="95" text-anchor="middle">余弦相似度召回</text></g>
+    <g><rect class="box" x="270" y="120" width="180" height="62" rx="9" fill="var(--business)" fill-opacity=".14" stroke="var(--business)"/>
+       <text class="nl" x="360" y="144" text-anchor="middle">② 图结构</text>
+       <text class="ns" x="360" y="162" text-anchor="middle">共享实体 / 邻域</text>
+       <text class="ns" x="360" y="175" text-anchor="middle">node2vec 相似</text></g>
+    <g><rect class="box" x="270" y="200" width="180" height="62" rx="9" fill="var(--decision)" fill-opacity=".10" stroke="var(--decision)" stroke-dasharray="4 3"/>
+       <text class="nl" x="360" y="224" text-anchor="middle">③ 文本匹配</text>
+       <text class="ns" x="360" y="242" text-anchor="middle">scenario 关键词</text></g>
+    <g><rect class="box" x="270" y="280" width="180" height="62" rx="9" fill="var(--meta)" fill-opacity=".10" stroke="var(--meta)" stroke-dasharray="4 3"/>
+       <text class="nl" x="360" y="304" text-anchor="middle">④ 类别过滤</text>
+       <text class="ns" x="360" y="322" text-anchor="middle">belongs_to 边</text></g>
+
+    <!-- fusion -->
+    <g><rect class="box" x="560" y="150" width="180" height="100" rx="10" fill="var(--decision)" fill-opacity=".20" stroke="var(--decision)" stroke-width="2.5"/>
+       <text class="nl" x="650" y="180" text-anchor="middle" style="font-size:13px">⭐ 加权融合</text>
+       <text class="ns" x="650" y="200" text-anchor="middle">0.4·语义 + 0.3·结构</text>
+       <text class="ns" x="650" y="215" text-anchor="middle">+ 0.2·文本 + 0.1·类别</text>
+       <text class="ns" x="650" y="235" text-anchor="middle" style="font-weight:600;fill:var(--decision)">排序 → Top-K</text></g>
+
+    <!-- results -->
+    <g><rect class="box" x="840" y="80" width="320" height="68" rx="9" fill="var(--business)" fill-opacity=".14" stroke="var(--business)"/>
+       <text class="nl" x="860" y="104">✓ 先例 #1</text><text class="ns" x="860" y="121">个人贷款 A-7291 · approved · 0.94</text>
+       <text class="ns" x="860" y="135" style="font-weight:600;fill:var(--business)">最高融合分</text></g>
+    <g><rect class="box" x="840" y="170" width="320" height="62" rx="9" fill="var(--page)" stroke="var(--ring)"/>
+       <text class="nl" x="860" y="194">先例 #2</text><text class="ns" x="860" y="211">房贷 B-1142 · rejected · 0.82</text></g>
+    <g><rect class="box" x="840" y="250" width="320" height="56" rx="9" fill="var(--page)" stroke="var(--ring)" stroke-opacity=".5"/>
+       <text class="nl" x="860" y="274" style="fill:var(--ink-muted)">先例 #3 (弱匹配)</text>
+       <text class="ns" x="860" y="291" style="fill:var(--ink-muted)">vendor_selection · 跨类别</text></g>
+
+    <!-- arrows -->
+    <path class="flow" style="stroke:var(--meta)" d="M170,200 C210,200 230,100 270,75" marker-end="url(#fm)"/>
+    <path class="flow" style="stroke:var(--ink-2)" d="M170,200 C210,200 230,150 270,150" marker-end="url(#fm)"/>
+    <path class="flow" style="stroke:var(--ink-2)" d="M170,200 C210,200 230,230 270,230" marker-end="url(#fm)"/>
+    <path class="flow" style="stroke:var(--ink-2)" d="M170,200 C210,200 230,310 270,310" marker-end="url(#fm)"/>
+    <path class="flow" style="stroke:var(--decision);stroke-width:3" d="M450,75 C500,75 520,180 560,180" marker-end="url(#fm)"/>
+    <path class="flow" style="stroke:var(--business);stroke-width:3" d="M450,150 C500,150 515,195 560,195" marker-end="url(#fm)"/>
+    <path class="flow" style="stroke:var(--decision);stroke-width:2;opacity:.6" d="M450,230 C500,230 515,210 560,210" marker-end="url(#fm)"/>
+    <path class="flow" style="stroke:var(--meta);stroke-width:2;opacity:.6" d="M450,310 C500,310 515,220 560,220" marker-end="url(#fm)"/>
+    <path class="flow" style="stroke:var(--ink-1);stroke-width:2.5" d="M740,200 C780,200 800,114 840,114" marker-end="url(#fm)"/>
+  </svg>
+
+  <div class="weights">
+    <div class="wcard"><div class="pct" style="color:var(--decision)">40%</div><div class="nm">语义 (semantic)</div><div class="wbar"><i style="width:100%;background:var(--decision)"></i></div></div>
+    <div class="wcard"><div class="pct" style="color:var(--business)">30%</div><div class="nm">图结构 (structural)</div><div class="wbar"><i style="width:75%;background:var(--business)"></i></div></div>
+    <div class="wcard"><div class="pct" style="color:var(--decision);opacity:.7">20%</div><div class="nm">文本 (text)</div><div class="wbar"><i style="width:50%;background:var(--decision);opacity:.7"></i></div></div>
+    <div class="wcard"><div class="pct" style="color:var(--meta)">10%</div><div class="nm">类别 (category)</div><div class="wbar"><i style="width:25%;background:var(--meta)"></i></div></div>
+  </div>
+
+  <div class="note">
+    <b>三档降级(源码 <code>find_precedents_hybrid</code> 真实逻辑):</b><br>
+    1️⃣ 优先走<b>向量库混合检索</b>(若 <code>hybrid_search</code> 组件可用)→ 2️⃣ 失败则降级为<b>增强图检索</b>(KG 算法)→ 3️⃣ 再失败走<b>基础图匹配</b>(向后兼容)。<br>
+    <b>⚠️ 实测提示:</b>在纯内存 <code>ContextGraph</code> + 决策量很小时,向量嵌入未充分生成,返回的是占位相似度——<b>真实语义检索需更大决策规模 + 嵌入就绪(或外部向量库)</b>。本图展示的是设计意图(机制示意),非本次小样本的真实打分。
+  </div>
+</div>
+</div>
+</body>
+</html>

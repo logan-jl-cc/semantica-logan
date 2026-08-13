@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantica 决策智能 · 可视化总览</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;  --page: #f9f9f7;
+    --ink-1: #0b0b0b;  --ink-2: #52514e;  --ink-muted: #898781;
+    --gridline: #e1e0d9;  --baseline: #c3c2b7;
+    --ring: rgba(11,11,11,0.10);
+    --decision: #2a78d6;  --business: #1baf7a;  --meta: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) { color-scheme:dark;--surface-1:#1a1a19;--page:#0d0d0d;--ink-1:#ffffff;--ink-2:#c3c2b7;--ink-muted:#898781;--gridline:#2c2c2a;--baseline:#383835;--ring:rgba(255,255,255,.10);--decision:#3987e5;--business:#199e70;--meta:#d95926; }
+  }
+  :root[data-theme="dark"]{color-scheme:dark;--surface-1:#1a1a19;--page:#0d0d0d;--ink-1:#ffffff;--ink-2:#c3c2b7;--ink-muted:#898781;--gridline:#2c2c2a;--baseline:#383835;--ring:rgba(255,255,255,.10);--decision:#3987e5;--business:#199e70;--meta:#d95926}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--page);color:var(--ink-1);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1320px;margin:0 auto;padding:24px 24px 60px}
+  code{background:var(--gridline);padding:1px 5px;border-radius:4px;font-size:11.5px}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:6px}
+  .topbar h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-0.01em}
+  .topbar .sub{color:var(--ink-2);font-size:13px;margin:2px 0 0}
+  .theme-btn{background:var(--surface-1);border:1px solid var(--ring);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--ink-1);cursor:pointer;font-family:inherit}
+
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0;padding:7px;background:var(--surface-1);border:1px solid var(--ring);border-radius:11px}
+  .tab{flex:1;min-width:150px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--ink-2);background:transparent;border:none;cursor:pointer;text-align:left;font-family:inherit;transition:background .15s,color .15s}
+  .tab:hover{background:var(--page);color:var(--ink-1)}
+  .tab.active{background:var(--decision);color:#fff}
+  .tab .tnum{display:inline-block;width:18px;height:18px;border-radius:50%;background:var(--gridline);color:var(--ink-muted);font-size:11px;text-align:center;line-height:18px;margin-right:7px;font-weight:700}
+  .tab.active .tnum{background:rgba(255,255,255,.25);color:#fff}
+
+  .panel{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:20px 22px;margin-top:14px}
+  .tabpane{display:none}
+  .tabpane.active{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .pane-title{font-size:17px;font-weight:650;margin:0 0 3px}
+  .pane-desc{color:var(--ink-2);font-size:13px;line-height:1.5;margin:0 0 4px}
+  .pane-hint{color:var(--ink-muted);font-size:12px;margin:0 0 16px}
+
+  .legend{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:14px 0 8px;padding:11px 14px;background:var(--page);border:1px solid var(--ring);border-radius:9px;font-size:12.5px}
+  .legend .grp{display:inline-flex;align-items:center;gap:6px;color:var(--ink-1)}
+  .legend .sw{width:13px;height:13px;display:inline-block}
+  .sw-dec{background:var(--decision);border-radius:50%}.sw-bus{background:var(--business);border-radius:3px}.sw-meta{background:var(--meta);transform:rotate(45deg);width:11px;height:11px}
+
+  svg{display:block;width:100%;height:auto}
+  .node-shape{stroke-width:2;cursor:pointer;transition:filter .15s}
+  .node:hover .node-shape{filter:brightness(1.08)}
+  .node-label{font-size:12px;font-weight:600;fill:var(--ink-1);pointer-events:none}
+  .node-sub{font-size:10.5px;fill:var(--ink-muted);pointer-events:none}
+  .edge-struct{stroke:var(--ink-muted);stroke-width:1.5;stroke-dasharray:5 4;fill:none;opacity:.65}
+  .edge-causal{stroke:var(--ink-1);stroke-width:2.5;fill:none}
+  .edge-label{font-size:10px;fill:var(--ink-2);font-weight:600}
+
+  .detail{margin-top:14px;padding:14px 16px;background:var(--page);border:1px solid var(--ring);border-radius:9px;min-height:70px;font-size:13px}
+  .detail h3{margin:0 0 3px;font-size:14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .detail .tag{font-size:10.5px;padding:2px 8px;border-radius:20px;color:#fff;font-weight:600}
+  .detail .id{font-size:11px;color:var(--ink-muted);font-family:ui-monospace,Menlo,monospace;margin:1px 0 10px;word-break:break-all}
+  .kv{display:grid;grid-template-columns:160px 1fr;gap:5px 14px}
+  .kv dt{color:var(--ink-muted);font-weight:500}.kv dd{margin:0;color:var(--ink-1);word-break:break-word}
+  .detail .placeholder{color:var(--ink-muted);font-style:italic}
+
+  .statrow{display:flex;gap:11px;flex-wrap:wrap;margin:0 0 14px}
+  .stat{flex:1;min-width:140px;background:var(--page);border:1px solid var(--ring);border-radius:9px;padding:12px 15px}
+  .stat .n{font-size:23px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+  .stat .l{font-size:11.5px;color:var(--ink-muted);margin-top:4px}
+
+  .note{margin-top:14px;padding:12px 15px;background:var(--page);border:1px solid var(--ring);border-radius:9px;font-size:12.5px;color:var(--ink-2);line-height:1.6}
+  .note b{color:var(--ink-1)}
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+<div class="topbar">
+  <div>
+    <h1>Semantica 决策智能 · 可视化总览</h1>
+    <p class="sub">贷款审批示例 — 同一条决策链的四张视图 ｜ 数据均来自真实 <code>to_dict()</code> 运行</p>
+  </div>
+  <button class="theme-btn" onclick="toggleTheme()">🌙 切换深色</button>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="0"><span class="tnum">1</span>节点存储信息</button>
+  <button class="tab" data-tab="1"><span class="tnum">2</span>边全貌(12 条)</button>
+  <button class="tab" data-tab="2"><span class="tnum">3</span>因果链回溯</button>
+  <button class="tab" data-tab="3"><span class="tnum">4</span>先例检索机制</button>
+</div>
+
+<!-- ============ PANE 0: NODES ============ -->
+<div class="tabpane active" data-pane="0">
+<div class="panel">
+  <p class="pane-title">图谱节点都存了哪些信息</p>
+  <p class="pane-desc">你显式调 5 次 API,Semantica 自动 fan-out 成 10 个节点 + 12 条边。</p>
+  <p class="pane-hint">👇 点击任意节点查看其存储的全部字段(来自真实 <code>to_dict()</code>)</p>
+
+  <div class="legend">
+    <span class="grp"><span class="sw sw-dec"></span>Decision(决策 · 圆)</span>
+    <span class="grp"><span class="sw sw-bus"></span>业务对象 Loan/Person(矩形)</span>
+    <span class="grp"><span class="sw sw-meta"></span>元数据 category/maker(菱形 · 自动)</span>
+  </div>
+
+  <svg viewBox="0 0 1240 620" role="img">
+    <defs>
+      <marker id="ca0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="currentColor"/></marker>
+    </defs>
+    <g style="color:var(--ink-muted)">
+      <path class="edge-struct" d="M250,250 C330,300 380,360 470,400"/>
+      <path class="edge-struct" d="M620,250 C560,300 520,360 500,400"/>
+      <path class="edge-struct" d="M620,250 C700,300 760,360 810,400"/>
+      <path class="edge-struct" d="M990,250 C820,320 640,380 530,405"/>
+    </g>
+    <g style="color:var(--ink-1)">
+      <path class="edge-causal" d="M330,205 C430,205 510,205 580,205" marker-end="url(#ca0)"/>
+      <text class="edge-label" x="455" y="196" text-anchor="middle">CAUSED</text>
+      <path class="edge-causal" d="M700,205 C800,205 880,205 950,205" marker-end="url(#ca0)"/>
+      <text class="edge-label" x="825" y="196" text-anchor="middle">INFLUENCED</text>
+    </g>
+
+    <g class="node" data-id="app" transform="translate(170,205)"><circle class="node-shape" r="82" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)"/><circle r="5" fill="var(--decision)" cy="-44"/><text class="node-label" text-anchor="middle" y="-18">credit_application</text><text class="node-sub" text-anchor="middle" y="-2">proceed_to_underwriting</text><text class="node-sub" text-anchor="middle" y="14" style="font-weight:600;fill:var(--ink-2)">conf 0.88 · system_auto</text><text class="node-sub" text-anchor="middle" y="40">💡 决策#1</text></g>
+    <g class="node" data-id="uw" transform="translate(640,205)"><circle class="node-shape" r="82" fill="var(--decision)" fill-opacity=".20" stroke="var(--decision)" stroke-width="2.5"/><circle r="5" fill="var(--decision)" cy="-44"/><text class="node-label" text-anchor="middle" y="-18">loan_underwriting</text><text class="node-sub" text-anchor="middle" y="-2">approved</text><text class="node-sub" text-anchor="middle" y="14" style="font-weight:600;fill:var(--ink-2)">conf 0.94 · alice</text><text class="node-sub" text-anchor="middle" y="40">💡 决策#2</text></g>
+    <g class="node" data-id="rate" transform="translate(1075,205)"><circle class="node-shape" r="78" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)"/><circle r="5" fill="var(--decision)" cy="-42"/><text class="node-label" text-anchor="middle" y="-18">interest_rate</text><text class="node-sub" text-anchor="middle" y="-2">rate_set_8.9pct</text><text class="node-sub" text-anchor="middle" y="14" style="font-weight:600;fill:var(--ink-2)">conf 0.99 · system_auto</text><text class="node-sub" text-anchor="middle" y="38">💡 决策#3</text></g>
+
+    <g class="node" data-id="loan" transform="translate(430,440)"><rect class="node-shape" x="-92" y="-42" width="184" height="84" rx="10" fill="var(--business)" fill-opacity=".16" stroke="var(--business)"/><text class="node-label" text-anchor="middle" y="-18">📄 Loan · loan_A7291</text><text class="node-sub" text-anchor="middle" y="2">amount 85000 USD · status pending</text><text class="node-sub" text-anchor="middle" y="20">applicant A-7291</text></g>
+    <g class="node" data-id="alice" transform="translate(870,440)"><rect class="node-shape" x="-88" y="-42" width="176" height="84" rx="10" fill="var(--business)" fill-opacity=".16" stroke="var(--business)"/><text class="node-label" text-anchor="middle" y="-18">👤 Person · alice</text><text class="node-sub" text-anchor="middle" y="2">Alice Chen</text><text class="node-sub" text-anchor="middle" y="20">Senior Underwriter</text></g>
+
+    <g class="node" data-id="cat1" transform="translate(170,560)"><rect class="node-shape" x="-66" y="-26" width="132" height="52" rx="6" fill="var(--meta)" fill-opacity=".14" stroke="var(--meta)" transform="rotate(45)"/><text class="node-label" text-anchor="middle" y="-4"># category</text><text class="node-sub" text-anchor="middle" y="14">credit_application</text></g>
+    <g class="node" data-id="cat2" transform="translate(470,560)"><rect class="node-shape" x="-72" y="-26" width="144" height="52" rx="6" fill="var(--meta)" fill-opacity=".14" stroke="var(--meta)" transform="rotate(45)"/><text class="node-label" text-anchor="middle" y="-4"># category</text><text class="node-sub" text-anchor="middle" y="14">loan_underwriting</text></g>
+    <g class="node" data-id="cat3" transform="translate(770,560)"><rect class="node-shape" x="-62" y="-26" width="124" height="52" rx="6" fill="var(--meta)" fill-opacity=".14" stroke="var(--meta)" transform="rotate(45)"/><text class="node-label" text-anchor="middle" y="-4"># category</text><text class="node-sub" text-anchor="middle" y="14">interest_rate</text></g>
+    <g class="node" data-id="mk1" transform="translate(1010,560)"><rect class="node-shape" x="-66" y="-26" width="132" height="52" rx="6" fill="var(--meta)" fill-opacity=".14" stroke="var(--meta)" transform="rotate(45)"/><text class="node-label" text-anchor="middle" y="-4">🔑 decision_maker</text><text class="node-sub" text-anchor="middle" y="14">system_auto</text></g>
+    <g class="node" data-id="mk2" transform="translate(1170,560)"><rect class="node-shape" x="-50" y="-26" width="100" height="52" rx="6" fill="var(--meta)" fill-opacity=".14" stroke="var(--meta)" transform="rotate(45)"/><text class="node-label" text-anchor="middle" y="-4">🔑 maker</text><text class="node-sub" text-anchor="middle" y="14">alice</text></g>
+  </svg>
+  <div class="detail" id="detail"><span class="placeholder">👆 点击任意节点查看存储字段</span></div>
+</div>
+</div>
+
+<!-- ============ PANE 1: EDGES ============ -->
+<div class="tabpane" data-pane="1">
+<div class="panel">
+  <p class="pane-title">12 条边的全貌</p>
+  <p class="pane-desc">结构边(involves/belongs_to/made_by)由 <code>record_decision()</code> 自动生成;因果边(CAUSED/INFLUENCED)显式建立。</p>
+  <div class="statrow">
+    <div class="stat"><div class="n" style="color:var(--business)">4</div><div class="l">involves · 决策→对象</div></div>
+    <div class="stat"><div class="n" style="color:var(--meta)">3</div><div class="l">belongs_to · 决策→类别</div></div>
+    <div class="stat"><div class="n" style="color:var(--meta)">3</div><div class="l">made_by · 决策→责任主体</div></div>
+    <div class="stat"><div class="n" style="color:var(--decision)">2</div><div class="l">CAUSED / INFLUENCED</div></div>
+  </div>
+  <div class="legend">
+    <span class="grp"><span class="sw sw-bus"></span>involves</span>
+    <span class="grp"><span class="sw sw-meta"></span>belongs_to / made_by</span>
+    <span class="grp"><span class="sw sw-dec"></span>CAUSED / INFLUENCED(因果)</span>
+  </div>
+  <svg viewBox="0 0 1240 360" role="img">
+    <defs>
+      <marker id="eb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--business)"/></marker>
+      <marker id="em" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--meta)"/></marker>
+      <marker id="ed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--decision)"/></marker>
+    </defs>
+    <!-- 3 decision nodes -->
+    <g><circle cx="180" cy="80" r="40" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/><text class="node-label" text-anchor="middle" x="180" y="84">决策#1</text></g>
+    <g><circle cx="540" cy="80" r="40" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/><text class="node-label" text-anchor="middle" x="540" y="84">决策#2</text></g>
+    <g><circle cx="900" cy="80" r="40" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/><text class="node-label" text-anchor="middle" x="900" y="84">决策#3</text></g>
+    <!-- causal edges -->
+    <path class="edge-causal" style="stroke:var(--decision)" d="M220,80 C330,80 430,80 500,80" marker-end="url(#ed)"/>
+    <text class="edge-label" x="360" y="72" text-anchor="middle" fill="var(--decision)">CAUSED</text>
+    <path class="edge-causal" style="stroke:var(--decision)" d="M580,80 C690,80 790,80 860,80" marker-end="url(#ed)"/>
+    <text class="edge-label" x="720" y="72" text-anchor="middle" fill="var(--decision)">INFLUENCED</text>
+
+    <!-- involves to loan (center) -->
+    <path class="edge-struct" style="stroke:var(--business)" d="M180,120 C180,170 350,200 460,230" marker-end="url(#eb)"/>
+    <path class="edge-struct" style="stroke:var(--business)" d="M540,120 C540,170 480,200 480,230" marker-end="url(#eb)"/>
+    <path class="edge-struct" style="stroke:var(--business)" d="M900,120 C900,170 620,200 510,232" marker-end="url(#eb)"/>
+    <g><rect class="node-shape" x="400" y="230" width="170" height="48" rx="9" fill="var(--business)" fill-opacity=".14" stroke="var(--business)"/><text class="node-label" x="485" y="252" text-anchor="middle">📄 loan_A7291</text><text class="node-sub" x="485" y="268" text-anchor="middle">involves ×3</text></g>
+
+    <!-- belongs_to to category -->
+    <path class="edge-struct" style="stroke:var(--meta)" d="M180,120 C140,170 120,260 150,310" marker-end="url(#em)"/>
+    <path class="edge-struct" style="stroke:var(--meta)" d="M540,120 C430,200 300,270 300,310" marker-end="url(#em)"/>
+    <path class="edge-struct" style="stroke:var(--meta)" d="M900,120 C700,210 470,280 430,312" marker-end="url(#em)"/>
+    <g><rect class="node-shape" x="60" y="310" width="170" height="44" rx="6" fill="var(--meta)" fill-opacity=".12" stroke="var(--meta)" transform="rotate(-6 145 332)"/><text class="node-label" x="145" y="330" text-anchor="middle"># category</text><text class="node-sub" x="145" y="345" text-anchor="middle">credit_app</text></g>
+    <g><rect class="node-shape" x="225" y="310" width="170" height="44" rx="6" fill="var(--meta)" fill-opacity=".12" stroke="var(--meta)"/><text class="node-label" x="310" y="330" text-anchor="middle"># category</text><text class="node-sub" x="310" y="345" text-anchor="middle">underwriting</text></g>
+    <g><rect class="node-shape" x="390" y="310" width="170" height="44" rx="6" fill="var(--meta)" fill-opacity=".12" stroke="var(--meta)" transform="rotate(6 475 332)"/><text class="node-label" x="475" y="330" text-anchor="middle"># category</text><text class="node-sub" x="475" y="345" text-anchor="middle">interest_rate</text></g>
+
+    <!-- made_by -->
+    <path class="edge-struct" style="stroke:var(--meta)" d="M540,120 C720,200 820,270 870,310" marker-end="url(#em)"/>
+    <g><rect class="node-shape" x="800" y="310" width="160" height="44" rx="6" fill="var(--meta)" fill-opacity=".12" stroke="var(--meta)" transform="rotate(6 880 332)"/><text class="node-label" x="880" y="330" text-anchor="middle">🔑 maker</text><text class="node-sub" x="880" y="345" text-anchor="middle">alice / system_auto</text></g>
+
+    <text class="edge-label" x="485" y="180" text-anchor="middle" fill="var(--business)">involves</text>
+    <text class="edge-label" x="310" y="240" text-anchor="middle" fill="var(--meta)">belongs_to</text>
+    <text class="edge-label" x="720" y="220" text-anchor="middle" fill="var(--meta)">made_by</text>
+  </svg>
+  <div class="note"><b>关键:</b>10 条结构边是 <code>record_decision()</code> <b>自动</b>生成(无需手写关联),仅 2 条因果边需显式 <code>add_causal_relationship()</code>。关系在记录时即结构化留存,支撑"按类别检索、追溯责任主体、回溯因果"。</div>
+</div>
+</div>
+
+<!-- ============ PANE 2: TRACE ============ -->
+<div class="tabpane" data-pane="2">
+<div class="panel">
+  <p class="pane-title">决策因果链回溯过程</p>
+  <p class="pane-desc">沿 CAUSED / INFLUENCED 边遍历,无需重跑推理,直接读图。左=上游 why,右=下游 what-if。</p>
+  <div class="legend">
+    <span class="grp"><span class="sw sw-meta"></span>upstream 回溯(trace_decision_chain)</span>
+    <span class="grp"><span class="sw sw-dec"></span>downstream 影响(analyze_decision_impact)</span>
+  </div>
+  <svg viewBox="0 0 1240 300" role="img">
+    <defs>
+      <marker id="tu" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--meta)"/></marker>
+      <marker id="td" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--decision)"/></marker>
+    </defs>
+    <!-- nodes: app(380) uw(620) rate(860) -->
+    <g><circle cx="380" cy="150" r="58" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/><text class="node-label" x="380" y="142" text-anchor="middle">credit_app</text><text class="node-sub" x="380" y="160" text-anchor="middle">distance 2</text></g>
+    <g><circle cx="620" cy="150" r="62" fill="var(--decision)" fill-opacity=".20" stroke="var(--decision)" stroke-width="2.5"/><text class="node-label" x="620" y="140" text-anchor="middle">underwriting</text><text class="node-sub" x="620" y="158" text-anchor="middle">distance 1 · 起点</text></g>
+    <g><circle cx="860" cy="150" r="58" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/><text class="node-label" x="860" y="142" text-anchor="middle">interest_rate</text><text class="node-sub" x="860" y="160" text-anchor="middle">起点 / 下游</text></g>
+
+    <!-- upstream arrows (right to left, meta) -->
+    <path class="edge-causal" style="stroke:var(--meta)" d="M800,150 C760,110 680,110 660,150" marker-end="url(#tu)"/>
+    <text class="edge-label" x="730" y="100" text-anchor="middle" fill="var(--meta)">← INFLUENCED 逆</text>
+    <path class="edge-causal" style="stroke:var(--meta)" d="M560,150 C520,110 440,110 420,150" marker-end="url(#tu)"/>
+    <text class="edge-label" x="490" y="100" text-anchor="middle" fill="var(--meta)">← CAUSED 逆</text>
+
+    <!-- downstream arrows (left to right, decision) -->
+    <path class="edge-causal" style="stroke:var(--decision);opacity:.85" d="M680,180 C720,220 800,220 820,180" marker-end="url(#td)"/>
+    <text class="edge-label" x="750" y="248" text-anchor="middle" fill="var(--decision)">INFLUENCED 正 →</text>
+    <text class="node-sub" x="860" y="240" text-anchor="middle" style="fill:var(--decision);font-weight:600">影响分 0.45</text>
+  </svg>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+    <div class="note"><b>上游 trace:</b><code>rate ← INFLUENCED ← underwriting ← CAUSED ← credit_app</code><br><span style="color:var(--ink-muted)">回答"why"——监管审计要的决策回放。每步带 causal_distance。</span></div>
+    <div class="note"><b>下游 impact:</b>underwriting → rate(直接)<br><span style="color:var(--ink-muted)">total_influenced=2,最高影响分 0.45。回答"what if"——撤销决策的风险传导。</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ============ PANE 3: PRECEDENT ============ -->
+<div class="tabpane" data-pane="3">
+<div class="panel">
+  <p class="pane-title">先例检索机制(混合检索)</p>
+  <p class="pane-desc">向量语义召回 + 图结构过滤 + 加权融合(基于 <code>find_precedents_hybrid</code> 真实实现)</p>
+  <svg viewBox="0 0 1200 380" role="img">
+    <defs>
+      <marker id="pf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--ink-2)"/></marker>
+    </defs>
+    <g><rect class="node-shape" x="20" y="150" width="140" height="70" rx="10" fill="var(--meta)" fill-opacity=".12" stroke="var(--meta)"/><text class="node-label" x="90" y="178" text-anchor="middle">🔍 查询</text><text class="node-sub" x="90" y="196" text-anchor="middle">个人贷款 低DTI</text></g>
+    <g><rect class="node-shape" x="270" y="50" width="170" height="56" rx="9" fill="var(--decision)" fill-opacity=".14" stroke="var(--decision)"/><text class="node-label" x="355" y="72" text-anchor="middle">① 语义向量 40%</text><text class="node-sub" x="355" y="90" text-anchor="middle">embedding 余弦</text></g>
+    <g><rect class="node-shape" x="270" y="125" width="170" height="56" rx="9" fill="var(--business)" fill-opacity=".14" stroke="var(--business)"/><text class="node-label" x="355" y="147" text-anchor="middle">② 图结构 30%</text><text class="node-sub" x="355" y="165" text-anchor="middle">共享实体 / node2vec</text></g>
+    <g><rect class="node-shape" x="270" y="200" width="170" height="56" rx="9" fill="var(--decision)" fill-opacity=".10" stroke="var(--decision)" stroke-dasharray="4 3"/><text class="node-label" x="355" y="222" text-anchor="middle">③ 文本 20%</text><text class="node-sub" x="355" y="240" text-anchor="middle">scenario 关键词</text></g>
+    <g><rect class="node-shape" x="270" y="275" width="170" height="56" rx="9" fill="var(--meta)" fill-opacity=".10" stroke="var(--meta)" stroke-dasharray="4 3"/><text class="node-label" x="355" y="297" text-anchor="middle">④ 类别 10%</text><text class="node-sub" x="355" y="315" text-anchor="middle">belongs_to 边</text></g>
+    <g><rect class="node-shape" x="560" y="140" width="180" height="90" rx="10" fill="var(--decision)" fill-opacity=".20" stroke="var(--decision)" stroke-width="2.5"/><text class="node-label" x="650" y="168" text-anchor="middle" style="font-size:13px">⭐ 加权融合</text><text class="node-sub" x="650" y="188" text-anchor="middle">排序 → Top-K</text><text class="node-sub" x="650" y="208" text-anchor="middle" style="font-weight:600;fill:var(--decision)">三档降级</text></g>
+    <g><rect class="node-shape" x="850" y="90" width="320" height="58" rx="9" fill="var(--business)" fill-opacity=".14" stroke="var(--business)"/><text class="node-label" x="870" y="114">✓ 先例 #1</text><text class="node-sub" x="870" y="131">个人贷款 A-7291 · approved</text></g>
+    <g><rect class="node-shape" x="850" y="170" width="320" height="54" rx="9" fill="var(--page)" stroke="var(--ring)"/><text class="node-label" x="870" y="194">先例 #2</text><text class="node-sub" x="870" y="211">房贷 B-1142 · rejected</text></g>
+    <g><rect class="node-shape" x="850" y="240" width="320" height="50" rx="9" fill="var(--page)" stroke="var(--ring)" stroke-opacity=".5"/><text class="node-label" x="870" y="262" style="fill:var(--ink-muted)">先例 #3 (弱)</text><text class="node-sub" x="870" y="278" style="fill:var(--ink-muted)">跨类别</text></g>
+
+    <path class="edge-causal" style="stroke:var(--ink-2)" d="M160,185 C210,185 230,78 270,78" marker-end="url(#pf)"/>
+    <path class="edge-causal" style="stroke:var(--ink-2)" d="M160,185 C210,185 230,153 270,153" marker-end="url(#pf)"/>
+    <path class="edge-causal" style="stroke:var(--ink-2)" d="M160,185 C210,185 230,228 270,228" marker-end="url(#pf)"/>
+    <path class="edge-causal" style="stroke:var(--ink-2)" d="M160,185 C210,185 230,303 270,303" marker-end="url(#pf)"/>
+    <path class="edge-causal" style="stroke:var(--decision);stroke-width:3" d="M440,78 C500,78 520,170 560,170" marker-end="url(#pf)"/>
+    <path class="edge-causal" style="stroke:var(--business);stroke-width:3" d="M440,153 C500,153 520,180 560,180" marker-end="url(#pf)"/>
+    <path class="edge-causal" style="stroke:var(--decision);stroke-width:2;opacity:.6" d="M440,228 C500,228 520,195 560,195" marker-end="url(#pf)"/>
+    <path class="edge-causal" style="stroke:var(--meta);stroke-width:2;opacity:.6" d="M440,303 C500,303 520,205 560,205" marker-end="url(#pf)"/>
+    <path class="edge-causal" style="stroke:var(--ink-1);stroke-width:2.5" d="M740,185 C780,185 800,119 850,119" marker-end="url(#pf)"/>
+  </svg>
+  <div class="note"><b>三档降级(源码真实逻辑):</b>① 向量库混合检索 → ② 增强图检索(KG 算法)→ ③ 基础图匹配。<br><b>⚠️ 实测:</b>纯内存 + 决策量小时返回占位相似度,真实语义检索需更大规模 + 嵌入就绪或外部向量库。本图为机制示意。</div>
+</div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// tab switching
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    const i=t.dataset.tab;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelector(`.tabpane[data-pane="${i}"]`).classList.add('active');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+});
+// node detail (pane 0)
+const DATA={
+  app:{kind:'决策节点 #1',tag:'decision',tagcls:'decision',id:'27326a95-…(UUID)',fields:{category:'credit_application',scenario:'个人贷款 A-7291: 收入85k, DTI 31%',reasoning:'收入达标、就业稳定',outcome:'proceed_to_underwriting',confidence:'0.88',decision_maker:'system_auto(责任主体)',timestamp:'1786495175.68',applicant_id:'A-7291',channel:'online'}},
+  uw:{kind:'决策节点 #2',tag:'decision',tagcls:'decision',id:'d09cf935-…(UUID)',fields:{category:'loan_underwriting',scenario:'A-7291 承销复核',reasoning:'DTI 31% 在政策内;36个月信用记录干净;风险等级 B2',outcome:'approved',confidence:'0.94',decision_maker:'alice(真人责任主体)',timestamp:'1786495175.68',risk_tier:'B2',dti:'0.31'}},
+  rate:{kind:'决策节点 #3',tag:'decision',tagcls:'decision',id:'f51ff7e5-…(UUID)',fields:{category:'interest_rate',scenario:'A-7291 定价',reasoning:'Prime + 2.4%, 风险等级 B2',outcome:'rate_set_8.9pct',confidence:'0.99',decision_maker:'system_auto',timestamp:'1786495175.68'}},
+  loan:{kind:'业务对象',tag:'business',tagcls:'business',id:'loan_A7291',fields:{type:'Loan',amount:'85000',currency:'USD',applicant:'A-7291',status:'pending'}},
+  alice:{kind:'业务对象',tag:'business',tagcls:'business',id:'alice',fields:{type:'Person',name:'Alice Chen',role:'Senior Underwriter'}},
+  cat1:{kind:'自动生成',tag:'meta',tagcls:'meta',id:'category_credit_application',fields:{type:'category',name:'credit_application'}},
+  cat2:{kind:'自动生成',tag:'meta',tagcls:'meta',id:'category_loan_underwriting',fields:{type:'category',name:'loan_underwriting'}},
+  cat3:{kind:'自动生成',tag:'meta',tagcls:'meta',id:'category_interest_rate',fields:{type:'category',name:'interest_rate'}},
+  mk1:{kind:'自动生成',tag:'meta',tagcls:'meta',id:'maker_system_auto',fields:{type:'decision_maker',name:'system_auto'}},
+  mk2:{kind:'自动生成',tag:'meta',tagcls:'meta',id:'maker_alice',fields:{type:'decision_maker',name:'alice'}}
+};
+const detail=document.getElementById('detail');
+document.querySelectorAll('.tabpane[data-pane="0"] .node').forEach(n=>{
+  n.addEventListener('click',()=>{
+    const d=DATA[n.dataset.id];if(!d)return;
+    let rows='';for(const[k,v]of Object.entries(d.fields)){rows+=`<dt>${k}</dt><dd>${v}</dd>`}
+    detail.innerHTML=`<h3>${d.kind} <span class="tag ${d.tagcls}">${d.tag}</span></h3><div class="id">id: ${d.id}</div><dl class="kv">${rows}</dl>`;
+  });
+});
+// theme toggle
+function toggleTheme(){
+  const b=document.body;
+  if(b.getAttribute('data-theme')==='dark'){b.setAttribute('data-theme','light')}
+  else{b.setAttribute('data-theme','dark')}
+}
+</script>
+</body>
+</html>

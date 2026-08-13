@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantica 决策图谱 · 12 条边的全貌</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;  --page: #f9f9f7;
+    --ink-1: #0b0b0b;  --ink-2: #52514e;  --ink-muted: #898781;
+    --gridline: #e1e0d9;  --baseline: #c3c2b7;
+    --ring: rgba(11,11,11,0.10);
+    --decision: #2a78d6;  --business: #1baf7a;  --meta: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;  --page: #0d0d0d;
+      --ink-1: #ffffff;  --ink-2: #c3c2b7;  --ink-muted: #898781;
+      --gridline: #2c2c2a;  --baseline: #383835;
+      --ring: rgba(255,255,255,0.10);
+      --decision: #3987e5;  --business: #199e70;  --meta: #d95926;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;  --page: #0d0d0d;
+    --ink-1: #ffffff;  --ink-2: #c3c2b7;  --ink-muted: #898781;
+    --gridline: #2c2c2a;  --baseline: #383835;
+    --ring: rgba(255,255,255,0.10);
+    --decision: #3987e5;  --business: #199e70;  --meta: #d95926;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--page);color:var(--ink-1);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1280px;margin:0 auto;padding:28px 24px 60px}
+  header h1{font-size:23px;margin:0 0 6px;font-weight:650;letter-spacing:-0.01em}
+  header p{color:var(--ink-2);margin:0 0 3px;font-size:14px;line-height:1.5}
+  header .hint{color:var(--ink-muted);font-size:12.5px}
+
+  .summary{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 6px}
+  .stat{flex:1;min-width:150px;background:var(--surface-1);border:1px solid var(--ring);border-radius:10px;padding:13px 16px}
+  .stat .n{font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+  .stat .l{font-size:12px;color:var(--ink-muted);margin-top:5px}
+
+  .grid{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;margin-top:14px}
+  .panel{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:16px 18px}
+  .panel h2{font-size:14px;margin:0 0 4px;font-weight:650}
+  .panel .sub{font-size:11.5px;color:var(--ink-muted);margin:0 0 12px}
+
+  .egroup{margin-bottom:13px}
+  .egroup:last-child{margin-bottom:0}
+  .egroup-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .egroup-head .chip{font-size:11.5px;font-weight:600;color:#fff;padding:2px 9px;border-radius:20px;white-space:nowrap}
+  .egroup-head .cnt{font-size:11.5px;color:var(--ink-muted)}
+  .egroup-head .desc{font-size:12px;color:var(--ink-2);margin-left:auto;text-align:right}
+  .elist{display:flex;flex-direction:column;gap:5px}
+  .erow{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;font-size:12.5px;padding:6px 9px;background:var(--page);border:1px solid var(--ring);border-radius:7px}
+  .erow .src{text-align:right;color:var(--ink-1);font-weight:500}
+  .erow .arr{color:var(--ink-muted);font-size:14px}
+  .erow .tgt{color:var(--ink-1);font-weight:500}
+  .pill{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--gridline);color:var(--ink-2);margin-left:4px;font-weight:500}
+
+  svg{display:block;width:100%;height:auto}
+  .edge-causal{stroke:var(--decision);stroke-width:2.5;fill:none}
+  .edge-struct{stroke-width:1.5;fill:none;opacity:.75}
+  .node-label{font-size:11px;font-weight:600;fill:var(--ink-1)}
+  .node-sub{font-size:9.5px;fill:var(--ink-muted)}
+
+  footer{margin-top:22px;font-size:12px;color:var(--ink-muted);line-height:1.65}
+  code{background:var(--gridline);padding:1px 5px;border-radius:4px;font-size:11.5px}
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+<header>
+  <h1>Semantica 决策图谱 · 边的全貌(12 条)</h1>
+  <p>同一条贷款审批示例,<code>to_dict()</code> 实际生成的 12 条边</p>
+  <p class="hint">结构边(involves / belongs_to / made_by)由 <code>record_decision()</code> 自动生成;因果边(CAUSED / INFLUENCED)由 <code>add_causal_relationship()</code> 显式建立。</p>
+</header>
+
+<div class="summary">
+  <div class="stat"><div class="n" style="color:var(--business)">4</div><div class="l">involves · 决策→业务对象</div></div>
+  <div class="stat"><div class="n" style="color:var(--meta)">3</div><div class="l">belongs_to · 决策→类别</div></div>
+  <div class="stat"><div class="n" style="color:var(--meta)">3</div><div class="l">made_by · 决策→责任主体</div></div>
+  <div class="stat"><div class="n" style="color:var(--decision)">2</div><div class="l">CAUSED / INFLUENCED · 因果</div></div>
+</div>
+
+<div class="grid">
+  <!-- LEFT: edge list grouped by type -->
+  <div class="panel">
+    <h2>按边类型分组</h2>
+    <p class="sub">每行 = 一条真实的边(source → target)</p>
+
+    <div class="egroup">
+      <div class="egroup-head"><span class="chip" style="background:var(--business)">involves</span><span class="cnt">4 条</span><span class="desc">决策 → 它作用的业务对象</span></div>
+      <div class="elist">
+        <div class="erow"><span class="src">credit_application</span><span class="arr">→</span><span class="tgt">loan_A7291<span class="pill">Loan</span></span></div>
+        <div class="erow"><span class="src">loan_underwriting</span><span class="arr">→</span><span class="tgt">loan_A7291<span class="pill">Loan</span></span></div>
+        <div class="erow"><span class="src">loan_underwriting</span><span class="arr">→</span><span class="tgt">alice<span class="pill">Person</span></span></div>
+        <div class="erow"><span class="src">interest_rate</span><span class="arr">→</span><span class="tgt">loan_A7291<span class="pill">Loan</span></span></div>
+      </div>
+    </div>
+
+    <div class="egroup">
+      <div class="egroup-head"><span class="chip" style="background:var(--meta)">belongs_to</span><span class="cnt">3 条</span><span class="desc">决策 → 类别节点(分类检索)</span></div>
+      <div class="elist">
+        <div class="erow"><span class="src">credit_application</span><span class="arr">→</span><span class="tgt">category:credit_application</span></div>
+        <div class="erow"><span class="src">loan_underwriting</span><span class="arr">→</span><span class="tgt">category:loan_underwriting</span></div>
+        <div class="erow"><span class="src">interest_rate</span><span class="arr">→</span><span class="tgt">category:interest_rate</span></div>
+      </div>
+    </div>
+
+    <div class="egroup">
+      <div class="egroup-head"><span class="chip" style="background:var(--meta)">made_by</span><span class="cnt">3 条</span><span class="desc">决策 → 责任主体(可追责)</span></div>
+      <div class="elist">
+        <div class="erow"><span class="src">credit_application</span><span class="arr">→</span><span class="tgt">maker:system_auto</span></div>
+        <div class="erow"><span class="src">loan_underwriting</span><span class="arr">→</span><span class="tgt">maker:alice</span></div>
+        <div class="erow"><span class="src">interest_rate</span><span class="arr">→</span><span class="tgt">maker:system_auto</span></div>
+      </div>
+    </div>
+
+    <div class="egroup">
+      <div class="egroup-head"><span class="chip" style="background:var(--decision)">CAUSED · INFLUENCED</span><span class="cnt">2 条</span><span class="desc">决策 → 决策(因果链,显式建立)</span></div>
+      <div class="elist">
+        <div class="erow"><span class="src">credit_application</span><span class="arr">→</span><span class="tgt">loan_underwriting <span class="pill" style="background:var(--decision);color:#fff">CAUSED</span></span></div>
+        <div class="erow"><span class="src">loan_underwriting</span><span class="arr">→</span><span class="tgt">interest_rate <span class="pill" style="background:var(--decision);color:#fff">INFLUENCED</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: mini topology -->
+  <div class="panel">
+    <h2>边类型在图上的样子</h2>
+    <p class="sub">同色 = 同类边;线型区分结构边(虚)与因果边(实)</p>
+    <svg viewBox="0 0 520 560" role="img" aria-label="边类型拓扑示意">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--business)"/></marker>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--meta)"/></marker>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--decision)"/></marker>
+      </defs>
+      <!-- involves (aqua, dashed) -->
+      <path class="edge-struct" style="stroke:var(--business);stroke-dasharray:5 4" d="M150,120 C200,170 230,220 250,280" marker-end="url(#a1)"/>
+      <path class="edge-struct" style="stroke:var(--business);stroke-dasharray:5 4" d="M260,120 C270,180 270,230 270,280" marker-end="url(#a1)"/>
+      <!-- belongs_to (orange, dashed) -->
+      <path class="edge-struct" style="stroke:var(--meta);stroke-dasharray:5 4" d="M370,120 C420,170 430,250 430,330" marker-end="url(#a2)"/>
+      <!-- made_by (orange, dashed) -->
+      <path class="edge-struct" style="stroke:var(--meta);stroke-dasharray:5 4" d="M150,120 C90,180 90,330 110,440" marker-end="url(#a2)"/>
+      <!-- causal (blue, solid) -->
+      <path class="edge-causal" d="M180,100 C220,100 250,100 280,100" marker-end="url(#a3)"/>
+      <path class="edge-causal" d="M360,100 C400,100 430,100 460,100" marker-end="url(#a3)"/>
+
+      <!-- decision nodes (row top) -->
+      <g><circle cx="130" cy="100" r="34" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/><text class="node-label" text-anchor="middle" y="96">决策#1</text><text class="node-sub" text-anchor="middle" y="110">credit_app</text></g>
+      <g><circle cx="320" cy="100" r="34" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/><text class="node-label" text-anchor="middle" y="96">决策#2</text><text class="node-sub" text-anchor="middle" y="110">underwriting</text></g>
+      <g><circle cx="490" cy="100" r="32" fill="var(--decision)" fill-opacity=".16" stroke="var(--decision)" stroke-width="2"/><text class="node-label" text-anchor="middle" y="98">决策#3</text><text class="node-sub" text-anchor="middle" y="111">rate</text></g>
+
+      <!-- business objects -->
+      <g><rect x="200" y="280" width="140" height="50" rx="8" fill="var(--business)" fill-opacity=".14" stroke="var(--business)" stroke-width="2"/><text class="node-label" text-anchor="middle" x="270" y="302">📄 Loan</text><text class="node-sub" text-anchor="middle" x="270" y="318">loan_A7291</text></g>
+
+      <!-- category -->
+      <g><rect x="358" y="330" width="150" height="46" rx="6" fill="var(--meta)" fill-opacity=".12" stroke="var(--meta)" stroke-width="2" transform="rotate(8 433 353)"/><text class="node-label" text-anchor="middle" x="433" y="350"># category</text><text class="node-sub" text-anchor="middle" x="433" y="365">loan_underwriting</text></g>
+
+      <!-- maker -->
+      <g><rect x="52" y="440" width="130" height="46" rx="6" fill="var(--meta)" fill-opacity=".12" stroke="var(--meta)" stroke-width="2" transform="rotate(-8 117 463)"/><text class="node-label" text-anchor="middle" x="117" y="460">🔑 maker</text><text class="node-sub" text-anchor="middle" x="117" y="475">system_auto</text></g>
+
+      <!-- edge-type callouts -->
+      <text x="222" y="190" font-size="9.5" fill="var(--business)" font-weight="600">involves</text>
+      <text x="395" y="240" font-size="9.5" fill="var(--meta)" font-weight="600">belongs_to</text>
+      <text x="60" y="300" font-size="9.5" fill="var(--meta)" font-weight="600">made_by</text>
+      <text x="200" y="92" font-size="9.5" fill="var(--decision)" font-weight="600">CAUSED</text>
+      <text x="382" y="92" font-size="9.5" fill="var(--decision)" font-weight="600">INFLUENCED</text>
+    </svg>
+  </div>
+</div>
+
+<footer>
+  <b>关键观察:</b> 10 条结构边(involves/belongs_to/made_by)是 <code>record_decision()</code> <b>自动</b>生成的——你无需手写关联代码。
+  只有 2 条因果边是你通过 <code>add_causal_relationship()</code> 显式建立的。
+  正是这些边让"按类别检索决策""追溯责任主体""回溯因果链"成为可能——<b>关系在记录时即结构化留存</b>。
+</footer>
+</div>
+</body>
+</html>

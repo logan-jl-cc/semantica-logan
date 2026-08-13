@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantica 决策图谱 · 节点存储信息可视化</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;  --page: #f9f9f7;
+    --ink-1: #0b0b0b;  --ink-2: #52514e;  --ink-muted: #898781;
+    --gridline: #e1e0d9;  --baseline: #c3c2b7;
+    --ring: rgba(11,11,11,0.10);
+    --decision: #2a78d6;  --business: #1baf7a;  --meta: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;  --page: #0d0d0d;
+      --ink-1: #ffffff;  --ink-2: #c3c2b7;  --ink-muted: #898781;
+      --gridline: #2c2c2a;  --baseline: #383835;
+      --ring: rgba(255,255,255,0.10);
+      --decision: #3987e5;  --business: #199e70;  --meta: #d95926;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;  --page: #0d0d0d;
+    --ink-1: #ffffff;  --ink-2: #c3c2b7;  --ink-muted: #898781;
+    --gridline: #2c2c2a;  --baseline: #383835;
+    --ring: rgba(255,255,255,0.10);
+    --decision: #3987e5;  --business: #199e70;  --meta: #d95926;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page); color: var(--ink-1);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 28px 24px 60px; }
+
+  header h1 { font-size: 24px; margin: 0 0 6px; font-weight: 650; letter-spacing: -0.01em; }
+  header p { color: var(--ink-2); margin: 0 0 4px; font-size: 14px; line-height: 1.5; }
+  header .hint { color: var(--ink-muted); font-size: 12.5px; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+    margin: 18px 0 8px; padding: 12px 14px;
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 10px;
+  }
+  .legend .grp { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-1); }
+  .legend .swatch { width: 14px; height: 14px; display: inline-block; }
+  .legend .sw-decision { background: var(--decision); border-radius: 50%; }
+  .legend .sw-business { background: var(--business); border-radius: 4px; }
+  .legend .sw-meta { background: var(--meta); transform: rotate(45deg); width: 12px; height: 12px; }
+  .legend .edge-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+  .legend .ln-solid { width: 26px; height: 0; border-top: 2.5px solid var(--ink-1); }
+  .legend .ln-dash  { width: 26px; height: 0; border-top: 1.5px dashed var(--ink-muted); }
+
+  .stage {
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 12px;
+    overflow: hidden; margin-top: 14px;
+  }
+  svg { display: block; width: 100%; height: auto; }
+
+  .node { cursor: pointer; }
+  .node-shape { stroke-width: 2; transition: filter .15s; }
+  .node:hover .node-shape { filter: brightness(1.08); }
+  .node-label { font-size: 12px; font-weight: 600; fill: var(--ink-1); pointer-events: none; }
+  .node-sub { font-size: 10.5px; fill: var(--ink-muted); pointer-events: none; }
+
+  .edge-struct { stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; opacity: .6; }
+  .edge-causal { stroke: var(--ink-1); stroke-width: 2.5; fill: none; }
+  .edge-label { font-size: 10px; fill: var(--ink-2); font-weight: 600; }
+
+  .detail {
+    margin-top: 16px; padding: 16px 18px;
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 12px;
+    min-height: 120px;
+  }
+  .detail h3 { margin: 0 0 4px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .detail .tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; color: #fff; font-weight: 600; }
+  .detail .tag.decision { background: var(--decision); }
+  .detail .tag.business { background: var(--business); }
+  .detail .tag.meta { background: var(--meta); }
+  .detail .id { font-size: 11.5px; color: var(--ink-muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; margin: 2px 0 12px; word-break: break-all; }
+  .kv { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; font-size: 13px; }
+  .kv dt { color: var(--ink-muted); font-weight: 500; }
+  .kv dd { margin: 0; color: var(--ink-1); word-break: break-word; }
+  .detail .placeholder { color: var(--ink-muted); font-size: 13px; font-style: italic; }
+
+  footer { margin-top: 22px; font-size: 12px; color: var(--ink-muted); line-height: 1.6; }
+  code { background: var(--gridline); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+
+<header>
+  <h1>Semantica 决策图谱 · 节点存储了哪些信息</h1>
+  <p>贷款审批示例 — <code>record_decision()</code> 记录后,ContextGraph 中实际生成的节点与边</p>
+  <p class="hint">数据来自真实运行(to_dict 输出)。<b>点击任意节点</b>查看其存储的全部字段。</p>
+</header>
+
+<div class="legend">
+  <span class="grp"><span class="swatch sw-decision"></span> Decision(决策节点 · 圆形)</span>
+  <span class="grp"><span class="swatch sw-business"></span> 业务对象 Loan / Person(圆角矩形)</span>
+  <span class="grp"><span class="swatch sw-meta"></span> 元数据 category / decision_maker(菱形,自动生成)</span>
+  <span class="edge-key"><span class="ln-solid"></span> 因果边 CAUSED / INFLUENCED</span>
+  <span class="edge-key"><span class="ln-dash"></span> 结构边 involves / belongs_to / made_by</span>
+</div>
+
+<div class="stage">
+<svg id="graph" viewBox="0 0 1240 660" role="img" aria-label="决策知识图谱">
+  <defs>
+    <marker id="arr-causal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+    <marker id="arr-struct" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-muted)"/>
+    </marker>
+  </defs>
+
+  <!-- edges layer: populated by JS, drawn under nodes -->
+  <g id="edges"></g>
+
+  <!-- nodes layer -->
+  <g id="nodes">
+    <!-- ROW 1: decisions (circles) -->
+    <g class="node" data-id="app" transform="translate(170,210)">
+      <circle class="node-shape" r="82" fill="var(--decision)" fill-opacity="0.16" stroke="var(--decision)"/>
+      <circle r="5" fill="var(--decision)" cy="-44"/>
+      <text class="node-label" text-anchor="middle" y="-18">credit_application</text>
+      <text class="node-sub" text-anchor="middle" y="-2">proceed_to_underwriting</text>
+      <text class="node-sub" text-anchor="middle" y="14" style="font-weight:600;fill:var(--ink-2)">conf 0.88 · by system_auto</text>
+      <text class="node-sub" text-anchor="middle" y="40">💡 决策节点 #1</text>
+    </g>
+    <g class="node" data-id="uw" transform="translate(640,210)">
+      <circle class="node-shape" r="82" fill="var(--decision)" fill-opacity="0.20" stroke="var(--decision)" stroke-width="2.5"/>
+      <circle r="5" fill="var(--decision)" cy="-44"/>
+      <text class="node-label" text-anchor="middle" y="-18">loan_underwriting</text>
+      <text class="node-sub" text-anchor="middle" y="-2">approved</text>
+      <text class="node-sub" text-anchor="middle" y="14" style="font-weight:600;fill:var(--ink-2)">conf 0.94 · by alice</text>
+      <text class="node-sub" text-anchor="middle" y="40">💡 决策节点 #2</text>
+    </g>
+    <g class="node" data-id="rate" transform="translate(1075,210)">
+      <circle class="node-shape" r="78" fill="var(--decision)" fill-opacity="0.16" stroke="var(--decision)"/>
+      <circle r="5" fill="var(--decision)" cy="-42"/>
+      <text class="node-label" text-anchor="middle" y="-18">interest_rate</text>
+      <text class="node-sub" text-anchor="middle" y="-2">rate_set_8.9pct</text>
+      <text class="node-sub" text-anchor="middle" y="14" style="font-weight:600;fill:var(--ink-2)">conf 0.99 · system_auto</text>
+      <text class="node-sub" text-anchor="middle" y="38">💡 决策节点 #3</text>
+    </g>
+
+    <!-- ROW 2: business objects (rounded rects) -->
+    <g class="node" data-id="loan" transform="translate(430,440)">
+      <rect class="node-shape" x="-92" y="-42" width="184" height="84" rx="10" fill="var(--business)" fill-opacity="0.16" stroke="var(--business)"/>
+      <text class="node-label" text-anchor="middle" y="-18">📄 Loan · loan_A7291</text>
+      <text class="node-sub" text-anchor="middle" y="2">amount 85000 USD · status pending</text>
+      <text class="node-sub" text-anchor="middle" y="20">applicant A-7291</text>
+    </g>
+    <g class="node" data-id="alice" transform="translate(870,440)">
+      <rect class="node-shape" x="-88" y="-42" width="176" height="84" rx="10" fill="var(--business)" fill-opacity="0.16" stroke="var(--business)"/>
+      <text class="node-label" text-anchor="middle" y="-18">👤 Person · alice</text>
+      <text class="node-sub" text-anchor="middle" y="2">Alice Chen</text>
+      <text class="node-sub" text-anchor="middle" y="20">Senior Underwriter</text>
+    </g>
+  </g>
+</svg>
+</div>
+
+<div class="detail" id="detail">
+  <span class="placeholder">👆 点击上方任意节点,查看它在图谱中存储的全部字段(来自 to_dict() 真实输出)。</span>
+</div>
+
+<footer>
+  <b>读图说明:</b> 你只显式调用了 3 次 <code>record_decision()</code> + 2 次 <code>add_node()</code>(共 5 个节点),
+  但 Semantica <b>自动 fan-out</b> 又生成了 3 个 <code>category</code> 节点 + 2 个 <code>decision_maker</code> 节点,
+  以及 <code>involves / belongs_to / made_by</code> 结构边 —— 决策被自动织入一张可查询、可追溯的图。
+  每个决策节点的 <code>reasoning</code>(推理依据)、<code>decision_maker</code>(责任主体)、<code>timestamp</code> 都已留存,满足"可审计 + 可追责"。
+  <i>(注:为聚焦核心,本图省略了 5 个自动生成的 category/maker 元数据节点,只展示 3 个决策 + 2 个业务对象;边的起止点由 JS 按节点真实边界动态计算。)</i>
+</footer>
+
+</div>
+
+<script>
+// ===== node geometry (centers from transform; shape per data-id) =====
+// shape: circle {r} | rect {w,h} (centered on the node's translate origin)
+const GEOM = {
+  app:   {x:170,  y:210, shape:'circle', r:82},
+  uw:    {x:640,  y:210, shape:'circle', r:82},
+  rate:  {x:1075,y:210, shape:'circle', r:78},
+  loan:  {x:430, y:440, shape:'rect', w:184, h:84},
+  alice: {x:870, y:440, shape:'rect', w:176, h:84},
+};
+
+// ===== boundary intersection: where the center→target ray hits the node edge =====
+function boundaryPoint(from, toId) {
+  const to = GEOM[toId];
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx/len, uy = dy/len;
+  if (to.shape === 'circle') {
+    return { x: to.x - ux*to.r, y: to.y - uy*to.r };
+  }
+  // rect centered at (to.x,to.y), half extents
+  const hw = to.w/2, hh = to.h/2;
+  const tx = (ux === 0) ? Infinity : hw / Math.abs(ux);
+  const ty = (uy === 0) ? Infinity : hh / Math.abs(uy);
+  const t = Math.min(tx, ty);   // distance to nearest edge along the ray
+  return { x: to.x - ux*t, y: to.y - uy*t };
+}
+
+// ===== edge definitions (source, target, type, optional label) =====
+const EDGES = [
+  // structural (dashed) — auto-generated by record_decision()
+  {from:'app',  to:'loan',  cls:'edge-struct', marker:'url(#arr-struct)'},
+  {from:'uw',   to:'loan',  cls:'edge-struct', marker:'url(#arr-struct)'},
+  {from:'uw',   to:'alice', cls:'edge-struct', marker:'url(#arr-struct)'},
+  {from:'rate', to:'loan',  cls:'edge-struct', marker:'url(#arr-struct)'},
+  // causal (solid) — explicit add_causal_relationship()
+  {from:'app',  to:'uw',    cls:'edge-causal', marker:'url(#arr-causal)', label:'CAUSED'},
+  {from:'uw',   to:'rate',  cls:'edge-causal', marker:'url(#arr-causal)', label:'INFLUENCED'},
+];
+
+// ===== render edges with precise boundary endpoints =====
+const SVGNS = 'http://www.w3.org/2000/svg';
+const edgesG = document.getElementById('edges');
+EDGES.forEach(e => {
+  const from = GEOM[e.from], to = GEOM[e.to];
+  const start = boundaryPoint(to, e.from);   // point on source's edge (toward target)
+  const end   = boundaryPoint(from, e.to);   // point on target's edge (toward source)
+  // gentle quadratic curve, control point at midpoint pulled slightly perpendicular
+  const mx = (start.x+end.x)/2, my=(start.y+end.y)/2;
+  const path = document.createElementNS(SVGNS,'path');
+  path.setAttribute('class', e.cls);
+  path.setAttribute('marker-end', e.marker);
+  path.setAttribute('d', `M${start.x.toFixed(1)},${start.y.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${end.x.toFixed(1)},${end.y.toFixed(1)}`);
+  edgesG.appendChild(path);
+  if (e.label) {
+    const lbl = document.createElementNS(SVGNS,'text');
+    lbl.setAttribute('class','edge-label');
+    lbl.setAttribute('text-anchor','middle');
+    lbl.setAttribute('x', mx.toFixed(1));
+    lbl.setAttribute('y', (my-6).toFixed(1));
+    lbl.textContent = e.label;
+    edgesG.appendChild(lbl);
+  }
+});
+
+// ===== node detail panel =====
+const DATA = {
+  app: { type:'decision', kind:'决策节点 #1', tag:'decision', id:'27326a95-…(UUID)', fields:{
+    'category':'credit_application','scenario':'个人贷款 A-7291: 收入85k, DTI 31%',
+    'reasoning':'收入达标、就业稳定','outcome':'proceed_to_underwriting',
+    'confidence':'0.88','decision_maker':'system_auto(责任主体)',
+    'timestamp':'1786495175.68','applicant_id':'A-7291','channel':'online',
+    '_note':'此外还存 reasoning_embedding / node2vec_embedding(向量,用于先例检索)'}},
+  uw: { type:'decision', kind:'决策节点 #2', tag:'decision', id:'d09cf935-…(UUID)', fields:{
+    'category':'loan_underwriting','scenario':'A-7291 承销复核',
+    'reasoning':'DTI 31% 在政策内;36个月信用记录干净;风险等级 B2','outcome':'approved',
+    'confidence':'0.94','decision_maker':'alice(真人责任主体)',
+    'timestamp':'1786495175.68','risk_tier':'B2','dti':'0.31'}},
+  rate:{ type:'decision', kind:'决策节点 #3', tag:'decision', id:'f51ff7e5-…(UUID)', fields:{
+    'category':'interest_rate','scenario':'A-7291 定价',
+    'reasoning':'Prime + 2.4%, 风险等级 B2','outcome':'rate_set_8.9pct',
+    'confidence':'0.99','decision_maker':'system_auto','timestamp':'1786495175.68'}},
+  loan:{ type:'business', kind:'业务对象', tag:'business', id:'loan_A7291', fields:{
+    'type':'Loan','amount':'85000','currency':'USD','applicant':'A-7291','status':'pending',
+    '_note':'业务对象 —— 决策所作用的载体。决策通过 involves 边关联到它。'}},
+  alice:{type:'business', kind:'业务对象', tag:'business', id:'alice', fields:{
+    'type':'Person','name':'Alice Chen','role':'Senior Underwriter',
+    '_note':'同时是承销决策的 decision_maker(责任主体)。'}},
+};
+
+const detail = document.getElementById('detail');
+document.querySelectorAll('.node').forEach(n => {
+  n.addEventListener('click', () => {
+    const d = DATA[n.dataset.id]; if (!d) return;
+    let rows = '';
+    for (const [k,v] of Object.entries(d.fields)) {
+      if (k==='_note') { rows += `<dt style="grid-column:1/-1;color:var(--ink-2);font-style:italic;padding-top:6px;border-top:1px solid var(--gridline);margin-top:4px">📝 ${v}</dt>`; continue; }
+      rows += `<dt>${k}</dt><dd>${v}</dd>`;
+    }
+    detail.innerHTML = `
+      <h3>${d.kind} <span class="tag ${d.tag}">${d.type}</span></h3>
+      <div class="id">id: ${d.id}</div>
+      <dl class="kv">${rows}</dl>`;
+  });
+});
+</script>
+</body>
+</html>
