@@ -18,6 +18,7 @@ source .venv/bin/activate    # Python 3.11 venv,已装好核心依赖
 | 03 | [多后端组合](03_multi_backend_storage/) | 内存图 + Oxigraph + FAISS + SQLite 四后端同时写入 | `python examples/case/03_multi_backend_storage/run.py` |
 | 04 | [可视化](04_visualization/) | 项目自带 KGVisualizer 导出交互式 HTML | `python examples/case/04_visualization/run.py` |
 | 05 | [Explorer 工作台](05_explorer_server/) | 启动浏览器图工作台(加载案例 01 的图) | `python examples/case/05_explorer_server/run.py` |
+| 06 | [Agno 双 Agent](06_agno_two_agents/) | Agno 双 agent 团队共享 Semantica 上下文做贷款审批 | `python examples/case/06_agno_two_agents/run.py --wiring-only` |
 
 ## 案例间的依赖
 
