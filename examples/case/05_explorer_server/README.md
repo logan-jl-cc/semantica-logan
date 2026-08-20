@@ -42,5 +42,8 @@ python examples/case/05_explorer_server/run.py
 
 ## 注意
 
+- **认证(v0.6.5 起)**:上游给 Explorer API 加了 `X-API-Key` 认证。本脚本默认设
+  `SEMANTICA_ALLOW_ANONYMOUS=true`(仅限 127.0.0.1 本地开发的显式豁免);
+  共享部署请 `export SEMANTICA_API_KEY=<secret>` 并让客户端带 `X-API-Key` 头。
 - 绑定 `127.0.0.1`(仅本机);生产部署需配持久化图库后端(Neo4j 等)。
 - 停止服务:`Ctrl+C`,或 `pkill -f semantica-explorer`。

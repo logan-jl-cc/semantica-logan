@@ -39,9 +39,17 @@ def main():
     print("=" * 60)
 
     # 启动服务(前台运行,带 --no-browser 由调用者手动开,或去掉该 flag 自动开)
+    # v0.6.5 起上游给 API 加了认证:本地开发用 SEMANTICA_ALLOW_ANONYMOUS=true 豁免;
+    # 共享部署请改用 SEMANTICA_API_KEY=<secret>(客户端请求需带 X-API-Key 头)。
+    env = os.environ.copy()
+    if not env.get("SEMANTICA_API_KEY"):
+        env.setdefault("SEMANTICA_ALLOW_ANONYMOUS", "true")
+        print("  认证:本地匿名模式(SEMANTICA_ALLOW_ANONYMOUS=true)")
+    else:
+        print("  认证:API key 模式(客户端需带 X-API-Key 头)")
     cmd = [EXPLORER, "--graph", GRAPH_JSON, "--port", "8000", "--host", "127.0.0.1"]
     try:
-        subprocess.run(cmd)
+        subprocess.run(cmd, env=env)
     except KeyboardInterrupt:
         print("\n已停止 Explorer 服务")
 
