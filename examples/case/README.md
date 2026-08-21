@@ -19,6 +19,7 @@ source .venv/bin/activate    # Python 3.11 venv,已装好核心依赖
 | 04 | [可视化](04_visualization/) | 项目自带 KGVisualizer 导出交互式 HTML | `python examples/case/04_visualization/run.py` |
 | 05 | [Explorer 工作台](05_explorer_server/) | 启动浏览器图工作台(加载案例 01 的图) | `python examples/case/05_explorer_server/run.py` |
 | 06 | [Agno 双 Agent](06_agno_two_agents/) | Agno 双 agent 团队共享 Semantica 上下文做贷款审批 | `python examples/case/06_agno_two_agents/run.py --wiring-only` |
+| 07 | [记忆底座对照](07_memory_comparison/) | 同一问题:向量记忆 vs 图谱记忆的对照实验 | `python examples/case/07_memory_comparison/run.py` |
 
 ## 案例间的依赖
 

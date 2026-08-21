@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>受治理 Action 层 — 示例设计讨论全记录</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;  --page: #f9f9f7;
+    --ink-1: #0b0b0b;  --ink-2: #52514e;  --ink-muted: #898781;
+    --gridline: #e1e0d9;  --baseline: #c3c2b7;
+    --ring: rgba(11,11,11,0.10);
+    --decision: #2a78d6;  --business: #1baf7a;  --meta: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --gridline: #2c2c2a; --baseline: #383835;
+      --ring: rgba(255,255,255,0.10);
+      --decision: #3987e5; --business: #199e70; --meta: #d95926;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d;
+    --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+    --gridline: #2c2c2a; --baseline: #383835;
+    --ring: rgba(255,255,255,0.10);
+    --decision: #3987e5; --business: #199e70; --meta: #d95926;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin:0; font-family: system-ui,-apple-system,"Segoe UI",sans-serif;
+         background:var(--page); color:var(--ink-1); -webkit-font-smoothing:antialiased; }
+  .wrap { max-width: 1080px; margin:0 auto; padding:30px 26px 80px; }
+  code { background:var(--gridline); padding:1px 6px; border-radius:4px; font-size:12px;
+         font-family: ui-monospace,"SF Mono",Menlo,monospace; }
+  .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:25px; margin:0 0 8px; font-weight:650; letter-spacing:-0.01em; }
+  header p  { color:var(--ink-2); margin:0 0 4px; font-size:14px; line-height:1.6; }
+  header .hint { color:var(--ink-muted); font-size:12px; }
+  .theme-btn { background:var(--surface-1); border:1px solid var(--ring); border-radius:8px;
+               padding:6px 12px; font-size:12px; color:var(--ink-1); cursor:pointer; font-family:inherit; flex-shrink:0; }
+
+  .toc { background:var(--surface-1); border:1px solid var(--ring); border-radius:12px;
+         padding:14px 18px; margin:18px 0 8px; }
+  .toc b { font-size:12.5px; color:var(--ink-muted); letter-spacing:.05em; }
+  .toc ol { margin:8px 0 2px; padding-left:22px; columns:2; column-gap:36px; }
+  .toc li { font-size:13px; padding:3px 0; }
+  .toc a { color:var(--ink-1); text-decoration:none; border-bottom:1px dashed var(--baseline); }
+  .toc a:hover { color:var(--decision); }
+  .toc .num { color:var(--ink-muted); font-variant-numeric:tabular-nums; margin-right:6px; }
+
+  section { margin-top:34px; }
+  .sec-head { display:flex; align-items:baseline; gap:12px; margin-bottom:4px; }
+  .sec-no { font-size:13px; font-weight:700; color:#fff; background:var(--decision);
+            border-radius:8px; padding:3px 10px; flex-shrink:0; }
+  h2 { font-size:19px; margin:0; font-weight:650; }
+  .sec-lead { color:var(--ink-2); font-size:13.5px; line-height:1.65; margin:8px 0 14px; }
+
+  .panel { background:var(--surface-1); border:1px solid var(--ring); border-radius:12px;
+           padding:18px 20px; margin:12px 0; }
+  .panel h3 { font-size:14.5px; margin:0 0 10px; font-weight:650; display:flex; align-items:center; gap:8px; }
+  .panel h3 .tag { font-size:10.5px; padding:2px 9px; border-radius:20px; color:#fff; font-weight:600; }
+  .tag.pal { background:var(--decision); } .tag.pdf { background:var(--meta); }
+  .tag.mix { background:var(--business); } .tag.fork { background:var(--ink-2); }
+
+  table { width:100%; border-collapse:collapse; font-size:12.8px; margin:8px 0; }
+  th { text-align:left; color:var(--ink-muted); font-weight:600; padding:7px 10px;
+       border-bottom:1.5px solid var(--baseline); white-space:nowrap; }
+  td { padding:7px 10px; border-bottom:1px solid var(--gridline); vertical-align:top; line-height:1.55; }
+  tr:last-child td { border-bottom:none; }
+  td b { font-weight:650; }
+  .c-pal { color:var(--decision); font-weight:600; }
+  .c-pdf { color:var(--meta); font-weight:600; }
+  .c-mix { color:var(--business); font-weight:600; }
+  .ok { color:var(--business); font-weight:650; }  .no { color:var(--meta); font-weight:650; }
+  .half { color:var(--decision); font-weight:650; }
+
+  .quote { border-left:3px solid var(--meta); background:var(--page); padding:10px 14px;
+           border-radius:0 8px 8px 0; font-size:12.8px; color:var(--ink-2); margin:10px 0; line-height:1.7; }
+  .quote b { color:var(--ink-1); }
+
+  pre { background:var(--page); border:1px solid var(--ring); border-radius:10px;
+        padding:14px 16px; overflow-x:auto; font-size:12px; line-height:1.7;
+        font-family: ui-monospace,"SF Mono",Menlo,monospace; color:var(--ink-1); margin:10px 0; }
+  pre .cm { color:var(--ink-muted); }
+  pre .k1 { color:var(--decision); font-weight:600; }
+  pre .k2 { color:var(--business); font-weight:600; }
+  pre .k3 { color:var(--meta); font-weight:600; }
+
+  .flow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:12px 0; }
+  .step-chip { background:var(--page); border:1.5px solid var(--decision); color:var(--decision);
+               border-radius:20px; padding:5px 13px; font-size:12px; font-weight:650; }
+  .step-chip.alt { border-color:var(--meta); color:var(--meta); }
+  .arrow { color:var(--ink-muted); font-size:14px; }
+
+  .legend-line { display:flex; flex-wrap:wrap; gap:14px; font-size:12px; color:var(--ink-muted); margin:6px 0 0; }
+  .legend-line .g { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:11px; height:11px; border-radius:3px; display:inline-block; }
+
+  .steps { margin:10px 0; }
+  .step { display:flex; gap:12px; padding:10px 0; border-bottom:1px dashed var(--gridline); }
+  .step:last-child { border-bottom:none; }
+  .step .n { flex-shrink:0; width:24px; height:24px; border-radius:50%; background:var(--decision);
+             color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .step .n.hot { background:var(--meta); }
+  .step .n.fin { background:var(--business); }
+  .step .body { font-size:13px; line-height:1.65; }
+  .step .body b { font-weight:650; }
+  .step .body .m { color:var(--ink-muted); }
+
+  .lineage { display:flex; height:26px; border-radius:8px; overflow:hidden; margin:10px 0 6px;
+             border:1px solid var(--ring); }
+  .lineage div { display:flex; align-items:center; justify-content:center; color:#fff;
+                 font-size:11.5px; font-weight:650; white-space:nowrap; }
+  .lg-pal { background:var(--decision); }  .lg-pdf { background:var(--meta); }
+  .lg-own { background:var(--business); }
+
+  .bridge { display:grid; grid-template-columns:1fr auto 1fr; gap:8px 14px; align-items:center; margin:10px 0; }
+  .bridge .box { background:var(--page); border:1.5px solid var(--ring); border-radius:10px;
+                 padding:10px 14px; font-size:12.8px; line-height:1.6; }
+  .bridge .box b { display:block; font-size:13px; margin-bottom:3px; }
+  .bridge .mid { color:var(--ink-muted); font-size:12px; text-align:center; white-space:nowrap; }
+
+  footer { margin-top:40px; padding-top:16px; border-top:1px solid var(--gridline);
+           font-size:12px; color:var(--ink-muted); line-height:1.7; }
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+
+<div class="topbar">
+  <header>
+    <h1>受治理 Action 层 — 示例设计讨论全记录</h1>
+    <p>一场从"本体论之辨"出发、落在一个贷款审批示例上的讨论:Palantir 的骨架 × 《决策原生方法论》的制度观 × Semantica 的载体。</p>
+    <p class="hint">文档按讨论的概念递进重排:背景 → 同构 → 概念 → 示例 → 生态 → 灵魂 → 边界 → 结论。蓝=Palantir 工程,橙=PDF 制度,青=合成/落地。</p>
+  </header>
+  <button class="theme-btn" onclick="toggleTheme()">🌙 深色</button>
+</div>
+
+<nav class="toc">
+  <b>目 录</b>
+  <ol>
+    <li><span class="num">0</span><a href="#s0">导言:这场讨论在回答什么</a></li>
+    <li><span class="num">1</span><a href="#s1">背景一:两种本体论</a></li>
+    <li><span class="num">2</span><a href="#s2">背景二:PDF 是 Palantir 的组织学翻译</a></li>
+    <li><span class="num">3</span><a href="#s3">核心概念:Action — 本体世界的动词</a></li>
+    <li><span class="num">4</span><a href="#s4">示例:「提高信用额度」完整走查</a></li>
+    <li><span class="num">5</span><a href="#s5">扩展:完整的 Action 生态</a></li>
+    <li><span class="num">6</span><a href="#s6">灵魂:PDF 的制度观(五命题)</a></li>
+    <li><span class="num">7</span><a href="#s7">现实边界:已有 vs 新设计</a></li>
+    <li><span class="num">8</span><a href="#s8">结论:对 fork 的意义</a></li>
+  </ol>
+</nav>
+
+<!-- ================= 0 导言 ================= -->
+<section id="s0">
+  <div class="sec-head"><span class="sec-no">0</span><h2>导言:这场讨论在回答什么</h2></div>
+  <p class="sec-lead">讨论由一个追问链驱动:<b>"Semantica 自称开源 Palantir,那 Palantir 的本体论到底是什么?"</b> → "PDF 和它什么关系?" → "Action 怎么理解?" → "示例里的 Action 是项目已有的吗?" → "示例按谁的理论设计?" → "PDF 的制度观指什么?" 本文档保留这条逻辑线,整理为可复查的设计记录。</p>
+  <div class="panel">
+    <h3><span class="tag mix">合成</span>三方嫁接 — 一句话总纲</h3>
+    <div class="bridge">
+      <div class="box" style="border-color:var(--decision)"><b style="color:var(--decision)">Palantir 本体论(骨架)</b>Objects · Links · Actions · Functions;Action 生命周期、风险分级审批、审计连锁</div>
+      <div class="mid">×<br>注魂</div>
+      <div class="box" style="border-color:var(--meta)"><b style="color:var(--meta)">《决策原生方法论》(魂)</b>判断/采纳三分 · 责任主体 · 强制 HITL · 不可变账本 · 知识单元版本化</div>
+    </div>
+    <div class="bridge">
+      <div class="mid">↓<br>落载体</div>
+      <div class="box" style="border-color:var(--business); grid-column:1/3"><b style="color:var(--business)">Semantica(fork,落地)</b>A-7291 贷款示例 · 已有的影子类(ApprovalChain / PolicyException / Policy.version)· 待建的 Action 引擎</div>
+    </div>
+    <div class="legend-line">
+      <span class="g"><span class="dot" style="background:var(--decision)"></span>Palantir 工程概念</span>
+      <span class="g"><span class="dot" style="background:var(--meta)"></span>PDF 制度概念</span>
+      <span class="g"><span class="dot" style="background:var(--business)"></span>合成 / 本项目落地</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 1 两种本体论 ================= -->
+<section id="s1">
+  <div class="sec-head"><span class="sec-no">1</span><h2>背景一:两种本体论</h2></div>
+  <p class="sec-lead">"本体"一词在两个世界里几乎是两种东西:<span class="c-pal">W3C 系</span>是知识表征的形式逻辑层,<span class="c-pdf" style="color:var(--decision)">Palantir</span> 是驱动运营的决策基质。区别不在"有没有本体",而在本体<b>用来干什么</b>。</p>
+  <div class="panel">
+    <h3><span class="tag pal">Palantir</span>与 W3C 传统本体的对照</h3>
+    <table>
+      <tr><th>维度</th><th>W3C / 传统本体</th><th>Palantir Ontology</th></tr>
+      <tr><td><b>本质定位</b></td><td>知识表征:形式化概念体系</td><td><b>运营语义层</b>:组织的"数字孪生"</td></tr>
+      <tr><td><b>形式基础</b></td><td>OWL/RDF/SHACL/SKOS,描述逻辑,开放世界</td><td><b>刻意不用 OWL</b>:强类型对象模型,务实建模</td></tr>
+      <tr><td><b>核心构件</b></td><td>类、公理、层级、推理规则</td><td><b>Objects + Links + Actions + Functions</b> 四件套</td></tr>
+      <tr><td><b>"动词"在哪</b></td><td>没有动词——修改靠 SPARQL UPDATE</td><td><b>Action 一等公民</b>:带校验、审批、事务、审计的写回</td></tr>
+      <tr><td><b>目的</b></td><td>互操作、推理、知识共享</td><td><b>决策</b>——本体存在的意义是让"行动"可被治理地发生</td></tr>
+      <tr><td><b>数据绑定</b></td><td>图即数据</td><td>对象由<b>数据管道物化</b>,有血缘</td></tr>
+      <tr><td><b>治理方式</b></td><td>SHACL 校验 + PROV 溯源</td><td>Action 审批流 + 权限标记 + 全程审计</td></tr>
+      <tr><td><b>消费方式</b></td><td>SPARQL 查询、推理机</td><td>应用、Agent(AIP 经<b>同一套 Action API</b> 行动)</td></tr>
+      <tr><td><b>互操作</b></td><td>W3C 开放标准</td><td>专有 SDK/API 生态</td></tr>
+    </table>
+    <p style="font-size:12.5px;color:var(--ink-2);line-height:1.7;margin:10px 0 0">
+      <b>三个关键差异:</b>① Palantir 的革命性在"动词"——Action 让本体从"世界的地图"变成"行动的操作系统";② 形式主义换实用主义——牺牲形式推理,换取事务性写回与业务绑定;③ "受治理的动态本体"(变更即决策)精神上其实<b>更接近 Palantir</b> 而非 W3C。</p>
+  </div>
+  <div class="panel">
+    <h3><span class="tag mix">Semantica</span>恰好站在两条腿上</h3>
+    <p style="font-size:12.8px;color:var(--ink-2);line-height:1.7">
+    Semantica(README 自称 <i>"The Open Source Palantir for AI Agents"</i>)同时持有两套:Palantir 式决策层(决策节点/审批链/因果链/溯源)+ W3C 全栈(RDF/OWL/SHACL/SPARQL——Palantir 没有的)。<b>双轨兼有,是它敢这么自称的底气。</b></p>
+  </div>
+</section>
+
+<!-- ================= 2 PDF 翻译 ================= -->
+<section id="s2">
+  <div class="sec-head"><span class="sec-no">2</span><h2>背景二:PDF 是 Palantir 的组织学翻译</h2></div>
+  <p class="sec-lead">Palantir 用<b>工程语言</b>(类型/管道/API)写同一结构,PDF 用<b>制度语言</b>(责任/采纳/追责/账本)重写。<b>同一副骨架,推导方向相反</b>:Palantir 自底向上(数据→语义→行动),PDF 自顶向下(制度公理→必要构件)。这就是"组织学翻译"的精确含义。</p>
+  <div class="panel">
+    <h3><span class="tag pdf">PDF</span>逐概念对照 Palantir</h3>
+    <table>
+      <tr><th>PDF 原文概念</th><th>Palantir 对应物</th><th>翻译了什么</th></tr>
+      <tr><td><b>业务对象</b>"决策节点对其写入状态"</td><td>Object 属性写回</td><td>写回被译成制度动作——"状态写入是决策成立的关键制度动作"</td></tr>
+      <tr><td><b>决策节点</b>五要素(目标/输入/依据/输出/<span class="c-pdf">责任主体</span>)</td><td>Action 类型签名</td><td>几乎逐字段转写;PDF 多出 Palantir 隐含不表的<b>责任主体必填</b></td></tr>
+      <tr><td><b>知识单元</b>"只读、带版本、必须显式引用"</td><td>校验规则 / Function</td><td>Palantir 把规则当功能;PDF 把"引用规则"升格为<b>审计通过的前提</b></td></tr>
+      <tr><td><b>强制 HITL</b>"事前结构化定义,运行中不可绕过"</td><td>Action 审批链</td><td>从"功能"升格为"结构性约束"——责任不得隐性转移</td></tr>
+      <tr><td><b>决策账本</b>"追加写入,不得修改"</td><td>Action 审计日志</td><td>PDF 字段清单几乎是审计记录的<b>规范化超集</b>+显式 append-only</td></tr>
+      <tr><td><b>决策图谱+轨迹</b>"沿路径串联,支持回放"</td><td>图 + action lineage</td><td>一边叫 lineage,一边叫轨迹——都是"可回放的因果谱系"</td></tr>
+      <tr><td><b>Skill</b>"可替换性与可审计性,而非智能程度"</td><td>Functions + AIP 工具</td><td>一句话总结 AIP 架构立场:agent 可提议,采纳必走 Action+审批</td></tr>
+      <tr><td><b>黑箱对用户/白箱可审计</b></td><td>权限标记体系</td><td>同一原则的两种表述</td></tr>
+      <tr><td><b>第一性约束</b>(可审计+可追责)</td><td>对监管行业的整个卖点</td><td>Palantir 用工程实现;PDF 写成<b>公理</b></td></tr>
+    </table>
+    <p style="font-size:12.5px;color:var(--ink-2);line-height:1.7;margin:10px 0 0">
+    <b>PDF 不只是翻译——三处走得更远:</b>① <b>失效模式</b>(跨轨迹归纳结构性失效→反哺机制修订,组织学习的一等概念,Palantir 无对应);② <b>入口决策</b>(对"是否启动决策路径"设闸);③ <b>判断/采纳/决策三分</b>(比 Action 模型更精细地回答"LLM 输出什么时候才算数")。</p>
+  </div>
+  <div class="panel">
+    <h3><span class="tag mix">同构</span>构件关系语法的咬合</h3>
+<pre>决策节点 ──读取──▶ 业务对象(事实/证据)   ≙  Action 读取 Object 属性
+决策节点 ──引用──▶ 知识单元(版本化规则)   ≙  Action 执行校验逻辑(带版本)
+决策节点 ──调用──▶ Skill(可替换能力)     ≙  Action 调用 Function/工具
+决策节点 ──写入──▶ 业务对象状态           ≙  Action 的 transactional writeback
+决策节点 ──生成──▶ 决策账本(不可变记录)   ≙  Action 审计落账
+失效模式 ──反馈至─▶ 图谱/知识单元修订      ≙  <span class="cm">(无直接对应——PDF 独有)</span></pre>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:6px 0 0">连 PDF 明言"构件关系<b>不描述实现方式</b>",都对应 Palantir"语义层与底层管道解耦"的立场。</p>
+  </div>
+</section>
+
+<!-- ================= 3 Action 概念 ================= -->
+<section id="s3">
+  <div class="sec-head"><span class="sec-no">3</span><h2>核心概念:Action — 本体世界的动词</h2></div>
+  <p class="sec-lead"><b>一句话:读世界靠查询,改世界必须走 Action。</b> Action 是本体中唯一被治理的写回通道——带类型、带校验、带审批、带审计的事务性写操作。提交本身就是对象,全程留痕。</p>
+  <div class="panel">
+    <h3><span class="tag pal">Palantir</span>四个本质属性 + 生命周期</h3>
+    <table>
+      <tr><th>属性</th><th>含义</th></tr>
+      <tr><td><b>类型化</b></td><td>像 API 签名:参数、目标对象、输出都是声明好的类型</td></tr>
+      <tr><td><b>校验</b></td><td>提交时跑规则:类型检查 + 逻辑规则(可查本体其他对象做依据)</td></tr>
+      <tr><td><b>审批</b></td><td>可配置审批链,按风险分级——低风险自动放行,高风险强制人工</td></tr>
+      <tr><td><b>审计</b></td><td>每次提交/审批/执行都落账:谁、何时、什么参数、谁批的、改了什么</td></tr>
+    </table>
+    <div class="flow">
+      <span class="step-chip">draft</span><span class="arrow">→</span>
+      <span class="step-chip">submitted<span style="font-weight:400">(校验)</span></span><span class="arrow">→</span>
+      <span class="step-chip">approved<span style="font-weight:400">(审批)</span></span><span class="arrow">→</span>
+      <span class="step-chip" style="border-color:var(--business);color:var(--business)">executed<span style="font-weight:400">(写回)</span></span>
+      <span class="arrow">/</span>
+      <span class="step-chip alt">rejected</span>
+    </div>
+    <p style="font-size:12.5px;color:var(--ink-2);line-height:1.7;margin:8px 0 0">
+    <b>边界规则(不是所有操作都是 Action):</b>读/算 = <b>Function</b>(不改状态,无需审批);写回 = <b>Action</b>(唯一通道,必经校验/审批/审计)。例:算 DTI 是 Function;改 creditLimit 是 Action。</p>
+  </div>
+</section>
+
+<!-- ================= 4 示例走查 ================= -->
+<section id="s4">
+  <div class="sec-head"><span class="sec-no">4</span><h2>示例:「提高信用额度」完整走查</h2></div>
+  <p class="sec-lead">载体是本会话一直沿用的 A-7291(收入 85k、36 个月干净记录、风险 B2)。<span class="c-pdf" style="color:var(--meta)">橙注</span>标出制度语义,<span class="c-pal">蓝注</span>标出工程机制。</p>
+  <div class="panel">
+    <h3><span class="tag pal">定义</span>Action 类型(事先声明)</h3>
+<pre><span class="k1">Action: IncreaseCreditLimit</span>
+目标对象:  Customer
+参数:
+  customerId    : Customer 链接(必填)
+  newLimit      : Decimal(必填)
+  justification : String(必填)
+校验规则:                                    <span class="cm">≙ 知识单元(版本化,判断必须引用)</span>
+  R1  newLimit &gt; 当前额度
+  R2  newLimit ≤ 5 × 年收入                  <span class="cm">可查询对象属性做依据</span>
+  R3  客户不在制裁名单(查另一组对象)
+审批策略(按风险分级):                         <span class="cm">≙ 风险阈值 → 强制 HITL</span>
+  ≤ $10k   → 自动放行
+  &gt; $10k   → 风控官审批(单步)
+  &gt; $100k  → 风控官 + 分行经理(两步)
+执行效果(写回 + 连锁):
+  Customer.creditLimit = newLimit            <span class="cm">≙ 状态写入(决策成立的制度动作)</span>
+  新增 LimitAuditEvent 对象并链接            <span class="cm">≙ 决策账本(append-only)</span>
+  触发 Function: 重算用信率、通知、回写核心系统  <span class="cm">≙ ricochet 连锁</span></pre>
+  </div>
+  <div class="panel">
+    <h3><span class="tag mix">运行时</span>AIP agent 发起(A-7291,10 万美元)</h3>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div class="body"><b>agent 提议</b> — LLM 分析客户对象 → 提交 Action(newLimit=100000 + justification)。<span class="m">提交者是 agent,但没有任何特权,走同一通道。≙ 判断:对组织尚无约束力。</span></div></div>
+      <div class="step"><div class="n">2</div><div class="body"><b>校验</b> — R1 ✓ R2 ✓ R3 ✓。<span class="m">任一失败:submission 打回,带失败原因。</span></div></div>
+      <div class="step"><div class="n hot">3</div><div class="body"><b>风险路由</b> — 100k 触及两步审批阈值 → 不自动放行,进入审批流。</div></div>
+      <div class="step"><div class="n hot">4</div><div class="body"><b>人工审批</b> — 风控官看到:提议者(agent,标注)、justification、校验结果、客户上下文 → 可批准/驳回/改参。风控官 ✓ → 分行经理 ✓。<span class="m">≙ 采纳:制度分界点,从此组织被绑定。</span></div></div>
+      <div class="step"><div class="n fin">5</div><div class="body"><b>执行写回</b> — creditLimit: 50k → 100k;LimitAuditEvent 落账(before/after、全员、时间戳);连锁:用信率重算、通知、核心系统同步。</div></div>
+      <div class="step"><div class="n fin">6</div><div class="body"><b>留痕</b> — submission 对象永久保存:agent 提议 → 校验 → 2 人审批 → 执行,整链可回放。<span class="m">≙ 决策轨迹。</span></div></div>
+    </div>
+    <p style="font-size:12.5px;color:var(--ink-2);line-height:1.7;margin:8px 0 0">
+    <b>为什么不让 agent 直接改数据?</b> ① 单一写通道 = 治理锚点,无旁路;② agent 被降权为"提议者"——责任始终落在授权的人;③ 风险分级是声明式配置,改阈值本身也是受治理的变更。</p>
+  </div>
+</section>
+
+<!-- ================= 5 Action 生态 ================= -->
+<section id="s5">
+  <div class="sec-head"><span class="sec-no">5</span><h2>扩展:完整的 Action 生态</h2></div>
+  <p class="sec-lead">一个领域里的 Action 不是孤例,而是覆盖生命周期的<b>动词集合</b>——且审批策略有丰富度:分层(自动/单审/两步/冷却期),甚至有反向需求(欺诈标记要"快"而非"严")。</p>
+  <div class="panel">
+    <h3><span class="tag pal">全景</span>贷款领域的 Action 清单(按生命周期)</h3>
+    <table>
+      <tr><th>阶段</th><th>Action</th><th>风险/审批</th><th>写回什么</th></tr>
+      <tr><td rowspan="2"><b>受理</b></td><td><code>SubmitLoanApplication</code></td><td>低·自动</td><td>创建 Application(状态=已受理)</td></tr>
+      <tr><td><code>RejectAtIntake</code></td><td>中·单审</td><td>Application.status=拒收</td></tr>
+      <tr><td rowspan="3"><b>核验</b></td><td><code>VerifyIncome</code></td><td>低·自动</td><td>incomeVerified=true + 证据链接</td></tr>
+      <tr><td><code>OrderCreditReport</code></td><td>低·自动</td><td>创建 CreditReport 对象</td></tr>
+      <tr><td><code>FlagFraudSuspect</code></td><td>中·<b>快速通道</b></td><td>riskFlag=可疑(要快,不能等两步)</td></tr>
+      <tr><td rowspan="5"><b>决策</b></td><td><code>ApproveLoan</code></td><td><b>高·两步</b></td><td>Loan.status=已批准</td></tr>
+      <tr><td><code>RejectLoan</code></td><td>高·单审</td><td>status=已拒绝(拒也要留理由——公平性审计)</td></tr>
+      <tr><td><code>WaivePolicy</code></td><td><b>最高·双人+理由必填</b></td><td>创建 PolicyException 对象</td></tr>
+      <tr><td><code>IncreaseCreditLimit</code></td><td>分级</td><td>Customer.creditLimit</td></tr>
+      <tr><td><code>FreezeCredit</code></td><td>中·单审</td><td>frozen=true</td></tr>
+      <tr><td rowspan="2"><b>定价签约</b></td><td><code>SetInterestRate</code></td><td>中·单审</td><td>Loan.rate=8.9%</td></tr>
+      <tr><td><code>DisburseLoan</code></td><td><b>最高·不可逆·双人+冷却期</b></td><td>status=已放款(资金动账)</td></tr>
+      <tr><td rowspan="4"><b>贷后</b></td><td><code>RecordPayment</code></td><td>低·自动(对账)</td><td>balance↓</td></tr>
+      <tr><td><code>FlagMissedPayment</code></td><td>低·自动</td><td>delinquency=1</td></tr>
+      <tr><td><code>RestructureLoan</code></td><td>高·两审</td><td>条款对象重建</td></tr>
+      <tr><td><code>UpdateRiskTier</code></td><td>中·单审</td><td>riskTier=B2→B1(影响后续所有定价)</td></tr>
+      <tr><td rowspan="2"><b>治理(元行动)</b></td><td><code>RevisePolicy</code></td><td><b>最高·变更委员会</b></td><td>知识单元版本号+1</td></tr>
+      <tr><td><code>ApproveOntologyChange</code></td><td>最高</td><td>schema 版本演进(接"受治理动态本体")</td></tr>
+    </table>
+  </div>
+  <div class="panel">
+    <h3><span class="tag mix">三类特殊 Action</span>性质不同的动词</h3>
+    <div class="steps">
+      <div class="step"><div class="n">①</div><div class="body"><b>入口决策型 · <code>SubmitLoanApplication</code></b><br>决定一条决策路径是否被激活——被拒收,后续所有 Action 都不发生。≙ PDF"入口决策":判断对象不是业务结论,而是路径是否应当启动。</div></div>
+      <div class="step"><div class="n hot">②</div><div class="body"><b>不可逆型 · <code>DisburseLoan</code></b><br>前置状态机校验 → 双人审批 + 4 小时冷却期(可撤销窗口)→ 放款后审计永不删改。不可逆动作享受最高规格——资金动过的事实必须永远可回放(账本 append-only 的制度理由)。</div></div>
+      <div class="step"><div class="n fin">③</div><div class="body"><b>元行动型 · <code>RevisePolicy</code></b><br>改的不是业务对象,是<b>规则本身</b>:新旧差异报告 + 受影响存量决策清单 → 变更委员会审批 → 版本+1、旧版归档保留。未来校验用新版,<b>历史决策仍引用当时的旧版</b>——可回放的关键。≙ 立法行动;接"受治理的动态本体"(变更即决策)。</div></div>
+    </div>
+    <p style="font-size:12.5px;color:var(--ink-2);line-height:1.7;margin:8px 0 0">
+    <b>回看因果链:</b>会话最初的 <code>credit_application → loan_underwriting → interest_rate</code> 因果链,Action 视角下即 <code>SubmitLoanApplication → ApproveLoan → SetInterestRate</code> 的轨迹——<b>PDF 的"决策轨迹" ≙ Action 序列的回放</b>。</p>
+  </div>
+</section>
+
+<!-- ================= 6 制度观 ================= -->
+<section id="s6">
+  <div class="sec-head"><span class="sec-no">6</span><h2>灵魂:PDF 的制度观(五命题)</h2></div>
+  <p class="sec-lead"><b>制度观 = 把设计的出发点从"系统如何运转"换成"组织何时受一项行为的约束"。</b>工程观问 <i>how it works</i>,制度观问 <i>when it binds</i>。五个命题均出自 PDF 原文。</p>
+  <div class="panel">
+    <div class="steps">
+      <div class="step"><div class="n">一</div><div class="body"><b>决策是制度性结果,不是技术操作</b>
+        <div class="quote">"决策是<b>被组织采纳</b>、写入业务对象状态并<b>承担责任</b>的制度性结果。" "采纳是判断与决策之间的<b>制度分界点</b>。"</div>
+        三分:<b>判断</b>(人或 Agent 产生,无制度后果)→ <b>采纳</b>(组织受约束的时刻)→ <b>决策</b>。写一条数据库记录 ≠ 组织做了一个决定。</div></div>
+      <div class="step"><div class="n">二</div><div class="body"><b>公理是制度的,不是技术的</b><br>第一性约束 = 可审计 + 可追责——面向监管与责任分配的<b>制度前提</b>,不满足则组织<b>无权采纳</b>。全部构件由这条公理推出。</div></div>
+      <div class="step"><div class="n hot">三</div><div class="body"><b>责任先于功能</b>
+        <div class="quote">"任何无法明确责任主体的判断,<b>不构成</b>决策节点。" "防止责任在自动化判断过程中被<b>隐性转移</b>。"</div>
+        责任主体必填、授权边界事前冻结、HITL 不可绕过——"这步是自动还是人工"在制度观里是<b>责任归属问题</b>,不是实现细节。</div></div>
+      <div class="step"><div class="n">四</div><div class="body"><b>记录具有制度效力(不只是数据)</b>
+        <div class="quote">"账本记录一经生成,<b>不得被修改或覆盖</b>,仅允许追加。"</div>
+        账本不是 log(工程物),是<b>不可抵赖的制度凭证</b>——公证处的登记簿,不是数据库的 binlog。回放服务于审计与追责,不是调试。</div></div>
+      <div class="step"><div class="n fin">五</div><div class="body"><b>演进本身受治理</b><br>可演进对象:风险阈值、HITL 触发条件、路径结构、知识单元内容;但<b>"第一性约束本身不可演进"</b>——公理不动。失效模式(跨轨迹归纳结构性失效→反哺修订)= 组织学习的制度化。等价于<b>宪制思维</b>:条文可修,修法本身有程序。</div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3><span class="tag mix">对照</span>工程观 vs 制度观 —— 示例里"注入"了什么</h3>
+    <table>
+      <tr><th>问题</th><th>工程观(Palantir 语言)</th><th>制度观(PDF 语言)</th></tr>
+      <tr><td>一次写回是什么</td><td>Action 执行:校验通过、事务写库</td><td><b>采纳</b>:授权的人在授权边界内让组织受到约束</td></tr>
+      <tr><td>agent 的输出</td><td>一次 API 调用的结果</td><td><b>判断</b>——采纳之前对组织无约束力</td></tr>
+      <tr><td>为什么审计</td><td>可观测性功能</td><td><b>不可抵赖性</b>——追责的制度前提</td></tr>
+      <tr><td>为什么 append-only</td><td>存储层不可变</td><td>记录是<b>制度凭证</b>,涂改即失信</td></tr>
+      <tr><td>规则是什么</td><td>validation logic(代码)</td><td><b>知识单元</b>——版本化、必须引用的"法条"</td></tr>
+      <tr><td>改规则</td><td>发版部署</td><td><b>立法行动</b>——本身要过治理</td></tr>
+      <tr><td>自动化</td><td>效率特性</td><td><b>责任的转移方式</b>——必须显式且经授权</td></tr>
+    </table>
+    <p style="font-size:12.5px;color:var(--ink-2);line-height:1.7;margin:10px 0 0">
+    <b>注入映射:</b>agent 填参提交=判断 / 风控官点批准=采纳 / 校验规则 R1-R3=知识单元 / LimitAuditEvent=决策账本 / 放款冷却期+永不删审计=不可逆制度事实 / RevisePolicy=立法。<b>没有这层注入,Action 只是"带审批流的 CRUD";注入之后,它回答的才是监管真正的问题——"凭什么说这是组织的决定?谁担责?凭什么信这份记录?"</b></p>
+  </div>
+</section>
+
+<!-- ================= 7 现实边界 ================= -->
+<section id="s7">
+  <div class="sec-head"><span class="sec-no">7</span><h2>现实边界:哪些是项目已有的,哪些是新设计的</h2></div>
+  <p class="sec-lead">诚实声明:<b>示例中的 Action 全部是为讨论新设计的</b>——项目里既没有"Action"抽象,也没有其中任何一个具体 Action。项目已有的是"影子"。</p>
+  <div class="panel">
+    <h3><span class="tag fork">血统</span>示例的设计来源构成</h3>
+    <div class="lineage">
+      <div class="lg-pal" style="width:70%">Palantir 骨架 ≈70%</div>
+      <div class="lg-pdf" style="width:20%">PDF 制度语义 ≈20%</div>
+      <div class="lg-own" style="width:10%">自研合成 ≈10%</div>
+    </div>
+    <p style="font-size:12px;color:var(--ink-muted);margin:2px 0 10px">载体:Semantica 真实数据(A-7291 + 已有数据类)。另两点声明:① 基于 Palantir 公开文档,非其内部实现复刻;② 非 W3C/OWL 建模(类型化对象思维本身即 Palantir 对 W3C 的偏离)。</p>
+    <table>
+      <tr><th>设计元素</th><th>来源</th></tr>
+      <tr><td>Objects / Links / Function-Action 边界 / 生命周期 / 风险分级 / ricochet</td><td class="c-pal">Palantir 公开模型(≈70%)</td></tr>
+      <tr><td>入口决策标注 · 知识单元=版本化校验规则 · 判断/采纳 · 不可变账本</td><td class="c-pdf">《决策原生方法论》(≈20%)</td></tr>
+      <tr><td>元行动(RevisePolicy / ApproveOntologyChange = 本体变更本身是 Action)</td><td class="c-mix">本讨论的合成(≈10%)</td></tr>
+    </table>
+  </div>
+  <div class="panel">
+    <h3><span class="tag fork">盘点</span>Semantica 已有的"影子"(会话中核实)</h3>
+    <table>
+      <tr><th>项目已有</th><th>位置</th><th>与 Action 的差距</th></tr>
+      <tr><td><code>ApprovalChain</code>(审批人/方式/上下文)</td><td>decision_models.py</td><td><b>记录</b>审批发生过,不<b>阻断</b>未审批流程</td></tr>
+      <tr><td><code>PolicyException</code>(豁免+审批人+理由)</td><td>decision_models.py</td><td>记录豁免,无"双人批准"强制</td></tr>
+      <tr><td><code>Policy.version</code></td><td>decision_models.py</td><td>有版本号,无"修订是受治理变更"机制</td></tr>
+      <tr><td><code>check_decision_rules</code> / PolicyEngine</td><td>policy_engine.py</td><td><b>事后检查</b>返回 verdict——非<b>事前校验+阻断</b></td></tr>
+      <tr><td><code>record_decision</code> + PROV-O</td><td>context_graph.py</td><td>记录决策,但决策不产生"写回状态"的效果</td></tr>
+    </table>
+    <p style="font-size:13px;line-height:1.7;margin:10px 0 0;color:var(--ink-1)">
+    <b>一句话概括差距:项目有"决策与审批的</b>账本<b>"(记录发生了什么),没有"Action</b>引擎<b>"(规定什么被允许发生、不批就不发生)。前者是史学,后者是法治。</b></p>
+  </div>
+</section>
+
+<!-- ================= 8 结论 ================= -->
+<section id="s8">
+  <div class="sec-head"><span class="sec-no">8</span><h2>结论:对 fork 的意义</h2></div>
+  <div class="panel">
+    <h3><span class="tag mix">收束</span>三句话</h3>
+    <div class="steps">
+      <div class="step"><div class="n">一</div><div class="body"><b>Palantir 给了 Action 一副骨架(它怎么跑),PDF 给了 Action 一个魂(它凭什么算数)。</b>骨架解决"单通道写回可治理",魂解决"组织何时被绑定、谁担责、凭证何以可信"。</div></div>
+      <div class="step"><div class="n">二</div><div class="body"><b>Semantica 已是这份规格的开源半实现:</b>决策节点/业务对象/账本/轨迹 ✅;阻断式 HITL 🟡(记录非阻断);append-only 账本 🟡;失效模式 ❌。差的恰是"从工程走向制度"的最后一步。</div></div>
+      <div class="step"><div class="n fin">三</div><div class="body"><b>自然的下一步:在 fork 里实现阻断式 Action 引擎原型</b>——校验规则=知识单元版本、风险分级路由审批、不批不写回、全链入账。那将一次补齐 PDF 的三个差距(强制 HITL / 状态写入 / 知识单元版本化),也是"开源版 Palantir"从口号变成代码的一步。本文档即其设计依据。</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <b>文档说明</b> — 整理自围绕贷款示例(A-7291)的讨论:<b>两种本体论之辨 → PDF 与 Palantir 的同构 → Action 概念与示例 → Action 生态 → 制度观五命题 → 已有/新设边界 → fork 路线</b>。<br>
+  事实性内容(项目已有的类、方法、行为)均经源码核实;Palantir 部分基于公开文档概念;《决策原生方法论》引文出自 <code>book/《决策原生方法论》.pdf</code>。<br>
+  关联文件:<code>examples/case/01_decision_intelligence/</code>(决策链演示)· <code>book/Agno双Agent决策序列图.html</code>(agent 集成视角)· <code>book/决策图谱节点信息.html</code>(图存储视角)。
+</footer>
+
+</div>
+<script>
+function toggleTheme(){
+  const b = document.body;
+  b.getAttribute('data-theme')==='dark' ? b.setAttribute('data-theme','light')
+                                        : b.setAttribute('data-theme','dark');
+}
+</script>
+</body>
+</html>

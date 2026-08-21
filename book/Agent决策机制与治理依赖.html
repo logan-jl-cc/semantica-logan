@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 决策机制与治理依赖 — 讨论整理</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;  --page: #f9f9f7;
+    --ink-1: #0b0b0b;  --ink-2: #52514e;  --ink-muted: #898781;
+    --gridline: #e1e0d9;  --baseline: #c3c2b7;
+    --ring: rgba(11,11,11,0.10);
+    --decision: #2a78d6;  --business: #1baf7a;  --meta: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --gridline: #2c2c2a; --baseline: #383835;
+      --ring: rgba(255,255,255,0.10);
+      --decision: #3987e5; --business: #199e70; --meta: #d95926;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d;
+    --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+    --gridline: #2c2c2a; --baseline: #383835;
+    --ring: rgba(255,255,255,0.10);
+    --decision: #3987e5; --business: #199e70; --meta: #d95926;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin:0; font-family: system-ui,-apple-system,"Segoe UI",sans-serif;
+         background:var(--page); color:var(--ink-1); -webkit-font-smoothing:antialiased; }
+  .wrap { max-width: 1040px; margin:0 auto; padding:30px 26px 80px; }
+  code { background:var(--gridline); padding:1px 6px; border-radius:4px; font-size:12px;
+         font-family: ui-monospace,"SF Mono",Menlo,monospace; }
+  .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:24px; margin:0 0 8px; font-weight:650; letter-spacing:-0.01em; }
+  header p  { color:var(--ink-2); margin:0 0 4px; font-size:14px; line-height:1.6; }
+  header .hint { color:var(--ink-muted); font-size:12px; }
+  .theme-btn { background:var(--surface-1); border:1px solid var(--ring); border-radius:8px;
+               padding:6px 12px; font-size:12px; color:var(--ink-1); cursor:pointer; font-family:inherit; flex-shrink:0; }
+
+  .toc { background:var(--surface-1); border:1px solid var(--ring); border-radius:12px;
+         padding:13px 18px; margin:18px 0 8px; display:flex; flex-wrap:wrap; gap:6px 18px; align-items:center; }
+  .toc b { font-size:12px; color:var(--ink-muted); letter-spacing:.05em; margin-right:4px; }
+  .toc a { color:var(--ink-1); text-decoration:none; font-size:12.8px; border-bottom:1px dashed var(--baseline); }
+  .toc a:hover { color:var(--decision); }
+
+  section { margin-top:32px; }
+  .sec-head { display:flex; align-items:baseline; gap:12px; margin-bottom:4px; }
+  .sec-no { font-size:13px; font-weight:700; color:#fff; background:var(--decision);
+            border-radius:8px; padding:3px 10px; flex-shrink:0; }
+  h2 { font-size:19px; margin:0; font-weight:650; }
+  .sec-lead { color:var(--ink-2); font-size:13.5px; line-height:1.65; margin:8px 0 14px; }
+
+  .panel { background:var(--surface-1); border:1px solid var(--ring); border-radius:12px;
+           padding:18px 20px; margin:12px 0; }
+  .panel h3 { font-size:14.5px; margin:0 0 10px; font-weight:650; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .panel h3 .tag { font-size:10.5px; padding:2px 9px; border-radius:20px; color:#fff; font-weight:600; }
+  .tag.pal { background:var(--decision); } .tag.pdf { background:var(--meta); }
+  .tag.mix { background:var(--business); } .tag.fork { background:var(--ink-2); }
+
+  table { width:100%; border-collapse:collapse; font-size:12.8px; margin:8px 0; }
+  th { text-align:left; color:var(--ink-muted); font-weight:600; padding:7px 10px;
+       border-bottom:1.5px solid var(--baseline); white-space:nowrap; }
+  td { padding:7px 10px; border-bottom:1px solid var(--gridline); vertical-align:top; line-height:1.55; }
+  tr:last-child td { border-bottom:none; }
+  td b { font-weight:650; }
+  .c-pal { color:var(--decision); font-weight:600; }
+  .c-pdf { color:var(--meta); font-weight:600; }
+  .c-mix { color:var(--business); font-weight:600; }
+
+  .quote { border-left:3px solid var(--meta); background:var(--page); padding:10px 14px;
+           border-radius:0 8px 8px 0; font-size:12.8px; color:var(--ink-2); margin:10px 0; line-height:1.7; }
+  .quote b { color:var(--ink-1); }
+
+  .layers { margin:12px 0; }
+  .layer { display:flex; gap:14px; padding:13px 0; border-bottom:1px dashed var(--gridline); }
+  .layer:last-child { border-bottom:none; }
+  .layer .ln { flex-shrink:0; width:44px; height:44px; border-radius:12px; color:#fff;
+               display:flex; flex-direction:column; align-items:center; justify-content:center;
+               font-weight:700; font-size:16px; line-height:1; }
+  .layer .ln small { font-size:8.5px; font-weight:600; margin-top:2px; }
+  .layer .body { font-size:13px; line-height:1.65; }
+  .layer .body b { font-weight:650; }
+  .layer .body .m { color:var(--ink-muted); }
+
+  .level-row { display:flex; align-items:stretch; gap:8px; margin:8px 0; }
+  .lvl { flex:1; border-radius:10px; padding:10px 12px; font-size:12px; line-height:1.55;
+         border:1.5px solid var(--ring); background:var(--page); }
+  .lvl b { display:block; font-size:12.5px; margin-bottom:3px; }
+  .lvl .lv-no { font-size:10.5px; color:var(--ink-muted); font-weight:700; }
+
+  .verdict { border:2px solid var(--business); background:var(--business); fill-opacity:.05;
+             border-radius:12px; padding:16px 20px; margin:14px 0; background:color-mix(in srgb, var(--business) 6%, var(--surface-1)); }
+  .verdict h3 { margin:0 0 8px; font-size:15px; color:var(--business); }
+  .verdict p { margin:4px 0; font-size:13.2px; line-height:1.7; }
+
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0; }
+  .split .col { border:1.5px solid var(--ring); border-radius:12px; padding:14px 16px; background:var(--page); }
+  .split .col h4 { margin:0 0 8px; font-size:13.5px; }
+  .split .col.dep h4 { color:var(--business); } .split .col.indep h4 { color:var(--meta); }
+  .split ul { margin:0; padding-left:18px; font-size:12.5px; line-height:1.75; color:var(--ink-1); }
+  @media (max-width:760px){ .split{grid-template-columns:1fr} }
+
+  footer { margin-top:40px; padding-top:16px; border-top:1px solid var(--gridline);
+           font-size:12px; color:var(--ink-muted); line-height:1.7; }
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+
+<div class="topbar">
+  <header>
+    <h1>Agent 决策机制与治理依赖 — 讨论整理</h1>
+    <p>三个递进的问题:agent 靠什么"决策"?它依赖 Palantir 的本体论吗?依赖与否的代价是什么?结论先行:<b>认知上零依赖,制度上需要一个采纳层——但那层不必是 Palantir 的。</b></p>
+    <p class="hint">承接《受治理Action层设计讨论》;蓝=Palantir 工程,橙=《决策原生方法论》制度观,青=综合落地。机制描述经案例 06(Agno×Semantica)实证参照。</p>
+  </header>
+  <button class="theme-btn" onclick="toggleTheme()">🌙 深色</button>
+</div>
+
+<nav class="toc">
+  <b>目 录</b>
+  <a href="#s1">1 机制解剖</a>
+  <a href="#s2">2 依赖之辨:认知 vs 制度</a>
+  <a href="#s3">3 采纳层的选择</a>
+  <a href="#s4">4 优缺点对照</a>
+  <a href="#s5">5 综合切分:判断自由,采纳受治</a>
+</nav>
+
+<!-- ============ 1 机制解剖 ============ -->
+<section id="s1">
+  <div class="sec-head"><span class="sec-no">1</span><h2>机制解剖:agent 靠什么"决策"</h2></div>
+  <p class="sec-lead">先纠正前提:<b>agent 自己并不"做决策",它只产生"判断"。</b>机制分三层——每层的确定性、责任归属完全不同。</p>
+  <div class="panel">
+    <div class="layers">
+      <div class="layer">
+        <div class="ln" style="background:var(--ink-2)">L1<small>核心</small></div>
+        <div class="body"><b>LLM 核心 —— 概率性判断</b><br>
+        下一 token 预测:基于训练分布的条件生成。不是深思熟虑,是统计模式匹配;温度采样 → <b>不可复现</b>。<span class="m">这一层是 agent 的"直觉",本体论管不着它。</span></div>
+      </div>
+      <div class="layer">
+        <div class="ln" style="background:var(--decision)">L2<small>循环</small></div>
+        <div class="body"><b>Agent 循环 —— 感知 → 推理 → 行动 → 观察 → 迭代</b><br>
+        每一轮"决策" = LLM 在上下文(提示 + 记忆 + 工具返回)约束下选择下一个动作。<span class="m">工具返回把世界喂给它;循环给它试错空间。</span></div>
+      </div>
+      <div class="layer">
+        <div class="ln" style="background:var(--business)">L3<small>委托</small></div>
+        <div class="body"><b>工具委托 —— 判断可被"外包"给确定性引擎</b><br>
+        agent 调用规则引擎/推理机(Rete / Datalog / 查询)时,判断质量由被委托引擎决定——<b>可以是确定性的</b>。<span class="m">≙ PDF 的 Skill:"Skill 不承担决策责任,核心是可替换性与可审计性,而非智能程度。"</span></div>
+      </div>
+    </div>
+    <p style="font-size:12.8px;color:var(--ink-2);line-height:1.7;margin:6px 0 0">
+    <b>关键认知:</b>这套机制<b>完全在本体论之外运行</b>。案例 06 的裸 Agno agent 不需要任何本体就能说"我认为该批准"——那只是一次判断,不构成对任何人的约束。</p>
+  </div>
+</section>
+
+<!-- ============ 2 依赖之辨 ============ -->
+<section id="s2">
+  <div class="sec-head"><span class="sec-no">2</span><h2>依赖之辨:认知依赖 vs 制度依赖</h2></div>
+  <p class="sec-lead">"依赖 Palantir 吗"其实是两个被混在一起的问题——答案相反。</p>
+  <div class="panel">
+    <table>
+      <tr><th>问题</th><th>答案</th><th>说明</th></tr>
+      <tr><td><b>agent 能不能判断?</b><br><span style="color:var(--ink-muted);font-size:11.5px">认知问题</span></td><td class="c-pdf" style="color:var(--business)">能,零依赖</td><td>LLM 本身就是判断机器;本体论不参与它的认知过程</td></tr>
+      <tr><td><b>agent 的判断能不能"算数"?<br><span style="color:var(--ink-muted);font-size:11.5px">制度问题</span></b></td><td>需要一层东西<br><span style="font-weight:400">但不必是 Palantir 的</span></td><td>判断 → 决策需要"采纳层"(校验/审批/写回/入账);这层有多种实现可替换</td></tr>
+    </table>
+    <div class="quote"><b>依赖的是"采纳层的存在",不是"Palantir 的采纳层"。</b>Palantir Ontology 只是采纳层的一个专有实现——把"需要制度"误当成"需要某家产品",是这个领域最常见的混淆。</div>
+    <p style="font-size:12.8px;color:var(--ink-2);line-height:1.7;margin:6px 0 0">
+    <b>实证参照:</b>案例 06 的 agent 在 Semantica 上跑,全程没碰 Palantir——agent 产生判断,<code>record_decision</code> 把它记为可审计对象。开源采纳层同样成立。</p>
+  </div>
+</section>
+
+<!-- ============ 3 采纳层的选择 ============ -->
+<section id="s3">
+  <div class="sec-head"><span class="sec-no">3</span><h2>采纳层的选择:三个层级</h2></div>
+  <p class="sec-lead">从裸 agent 到受治理行动层,是光谱而非二值——每一级买入不同的东西。</p>
+  <div class="panel">
+    <div class="level-row">
+      <div class="lvl" style="border-color:var(--ink-muted)"><span class="lv-no">层级 0</span><b>裸 agent(LLM + 工具)</b>有判断,无治理。写日志即效果,判断静默生效。</div>
+      <div class="lvl" style="border-color:var(--decision)"><span class="lv-no">层级 1</span><b>agent + 任意共享结构</b>(图 / 库 / 向量存储)有共享状态,多 agent 可读同一份;但写回仍不受治。</div>
+      <div class="lvl" style="border-color:var(--business)"><span class="lv-no">层级 2</span><b>agent + 受治理行动层</b>判断必须过类型化校验 / 审批 / 写回 / 入账才生效。<b>判断在此成为决策。</b></div>
+    </div>
+    <table>
+      <tr><th>层级 2 的实现选项</th><th>性质</th><th>代价</th></tr>
+      <tr><td class="c-pal">Palantir Ontology / AIP</td><td>专有、重、最完整(Objects/Actions/审批/权限)</td><td>平台锁定、高门槛</td></tr>
+      <tr><td class="c-mix">Semantica + PDF 制度观 ★</td><td>开源、轻;决策节点/审批链/溯源已有,缺阻断式引擎</td><td>治理骨架需自建(本 fork 的方向)</td></tr>
+      <tr><td>自建审批中间件</td><td>最轻、最贴身</td><td>治理债自己背(校验/审计/版本全要造)</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 4 优缺点对照 ============ -->
+<section id="s4">
+  <div class="sec-head"><span class="sec-no">4</span><h2>优缺点对照:依赖 vs 不依赖</h2></div>
+  <p class="sec-lead">"依赖"= 走受治理采纳层;"不依赖"= 裸 agent 直接生效。各有真实的使用域。</p>
+  <div class="split">
+    <div class="col dep">
+      <h4>✚ 依赖(有受治理采纳层)</h4>
+      <ul>
+        <li><b>判断可被采纳为决策</b>:类型化校验、审批闸、写回入账——组织真正受约束</li>
+        <li><b>共享世界模型</b>:多 agent / 人读同一状态,无复制同步、无状态漂移</li>
+        <li><b>可审计可追责</b>:谁、何时、依据什么、谁批的——可回放(PDF 第一性约束)</li>
+        <li><b>接地</b>:读结构化事实而非自由文本,幻觉面收窄</li>
+        <li><b>责任显式</b>:HITL 闸口钉死"谁担责",不在自动化中隐性漂移</li>
+        <li><b>生效路径确定</b>:判断即使非确定,采纳过程可复现</li>
+      </ul>
+      <h4 style="margin-top:12px">− 代价</h4>
+      <ul>
+        <li><b>前置建模成本高</b>:先定义对象/Action 类型才能跑;冷启动贵</li>
+        <li><b>刚性</b>:schema 变更走治理,演进慢;快变领域吃亏</li>
+        <li><b>延迟与摩擦</b>:低风险决定配两步审批 = 过度设计</li>
+        <li><b>单写通道</b>可能成吞吐瓶颈</li>
+        <li><b>锁定风险</b>:Palantir 尤甚;涌现现象被类型系统挤压</li>
+      </ul>
+    </div>
+    <div class="col indep">
+      <h4>✚ 不依赖(裸 agent / 仅共享存储)</h4>
+      <ul>
+        <li><b>零建模成本</b>,当天上线;探索期友好</li>
+        <li><b>完全灵活</b>:无 schema 束缚,领域怎么变就怎么来</li>
+        <li><b>无锁定、无平台税</b></li>
+        <li><b>低风险高频小决策</b>的合理选择</li>
+      </ul>
+      <h4 style="margin-top:12px">− 代价</h4>
+      <ul>
+        <li><b>判断静默生效</b>:agent 写了就算,没有"采纳"环节</li>
+        <li><b>无共享事实源</b>:多 agent 各说各话</li>
+        <li><b>审计只有日志</b>:不可回放、不可追责;监管场景直接出局</li>
+        <li><b>幻觉无接地约束</b></li>
+        <li><b>责任弥散</b>:"是 agent 干的"不是答案</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 综合切分 ============ -->
+<section id="s5">
+  <div class="sec-head"><span class="sec-no">5</span><h2>综合切分:判断自由,采纳受治</h2></div>
+  <p class="sec-lead">这不是二选一——《决策原生方法论》的判断/采纳三分,恰好就是这道题的标准答案。</p>
+  <div class="verdict">
+    <h3>◆ 结论:认知开放 + 制度收敛</h3>
+    <p><b>判断层保持自由(不依赖任何本体论)</b>——agent 用什么机制想都行:LLM 直觉、委托规则引擎、问人,机制可插拔(≙ Skill 可替换)。</p>
+    <p><b>采纳层必须受治(依赖一个治理结构)</b>——但结构可替换:Palantir 是重专有实现,Semantica + PDF 是轻开源实现,自建是最小实现。</p>
+    <p>依赖的价值<b>不在让 agent 想得更好,而在让它的想法算数</b>——是效力问题,不是智力问题。</p>
+  </div>
+  <div class="panel">
+    <h3><span class="tag fork">按场景选层级</span></h3>
+    <table>
+      <tr><th>场景</th><th>推荐层级</th><th>理由</th></tr>
+      <tr><td>探索 / 研究 / 内部工具</td><td>层级 0–1</td><td>快、灵活;错误的代价可承受</td></tr>
+      <tr><td>多 agent 协作但低风险</td><td>层级 1</td><td>要共享状态,还不需要重治理</td></tr>
+      <tr><td>受监管 / 高风险 / 不可逆<br>(放款、用药、豁免)</td><td><b>层级 2</b></td><td>可追责与可回放是<b>准入条件</b>,不是优化项</td></tr>
+      <tr><td>两者混合(常态)</td><td>分级路由</td><td>风险阈值分流:低风险自动放行,高风险进审批 ≙ Action 风险分级</td></tr>
+    </table>
+  </div>
+  <div class="panel">
+    <h3><span class="tag mix">对 fork 的意义</span></h3>
+    <p style="font-size:13px;line-height:1.7;color:var(--ink-1)">
+    Palantir = "认知开放 + 制度收敛"的<b>重专有实现</b>;Semantica + PDF = 同一切分的<b>轻开源实现</b>。这个 fork 的定位由此明确:<b>不依赖 Palantir,但要实现 Palantir 解决的那个问题</b>——判断自由地产生,决策受治地生效。具体缺口仍是那份 Action 引擎原型(校验前置 / 风险分级路由 / 不批不写回 / 全链入账)。</p>
+  </div>
+</section>
+
+<footer>
+  <b>文档说明</b> — 整理自"agent 决策机制 / 是否依赖 Palantir 本体论 / 优缺点"的讨论,承接《受治理Action层设计讨论.html》。<br>
+  机制描述参照案例 06(Agno × Semantica,判断层零本体依赖的实证);制度概念出自 <code>book/《决策原生方法论》.pdf</code>(判断/采纳三分、Skill、强制 HITL);Palantir 部分基于公开文档。<br>
+  关联:<code>examples/case/06_agno_two_agents/</code> · <code>book/受治理Action层设计讨论.html</code> · <code>book/Agno双Agent决策序列图.html</code>
+</footer>
+
+</div>
+<script>
+function toggleTheme(){
+  const b = document.body;
+  b.getAttribute('data-theme')==='dark' ? b.setAttribute('data-theme','light')
+                                        : b.setAttribute('data-theme','dark');
+}
+</script>
+</body>
+</html>
