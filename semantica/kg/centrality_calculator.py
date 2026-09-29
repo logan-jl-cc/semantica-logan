@@ -622,6 +622,16 @@ class CentralityCalculator:
         try:
             self.logger.info("Calculating PageRank scores")
 
+            # ContextGraph.nodes is a dict rather than a NetworkX NodeView,
+            # so an attribute presence test would skip the conversion and the
+            # node filter below would then call that dict.
+            needs_conversion = not callable(getattr(graph, "nodes", None))
+            if needs_conversion and hasattr(self, "_to_networkx"):
+                try:
+                    graph = self._to_networkx(graph)
+                except Exception:
+                    pass
+
             # Filter nodes by labels if specified
             nodes = self._filter_nodes_by_labels(graph, node_labels)
             if not nodes:
